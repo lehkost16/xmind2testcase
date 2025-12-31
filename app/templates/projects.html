@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>项目管理 | Xmind2TestCase</title>
+    <link rel="shortcut icon" href="{{ url_for('static',path='favicon.ico') }}" type="image/x-icon"/>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+    <link rel="stylesheet" type="text/css" media="all" href="{{ url_for('static',path='css/style.css') }}">
+    <script src="{{ url_for('static',path='js/pagination.js') }}" defer></script>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar">
+            <div class="brand">
+                <h1>X2T</h1>
+            </div>
+            <nav>
+                <a href="{{ url_for('index') }}" class="nav-item">
+                    <span class="icon">🏠</span> 首页仪表盘
+                </a>
+                <a href="{{ url_for('manage_projects') }}" class="nav-item active">
+                    <span class="icon">📂</span> 项目管理
+                </a>
+                <a href="{{ url_for('manage_configs') }}" class="nav-item">
+                    <span class="icon">⚙️</span> 系统配置
+                </a>
+            </nav>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <header class="top-bar" style="margin-bottom: 1.5rem; padding-bottom: 0.75rem;">
+                <h2 style="margin: 0;">项目管理</h2>
+                <p style="color: var(--text-muted); margin: 0.25rem 0 0 0; font-size: 0.9rem;">在这里统一管理您的所有测试项目，支持编辑和查看项目详情。</p>
+            </header>
+
+            <div class="content-wrapper">
+                <!-- Project List -->
+                <div class="card table-card">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                        <h3 style="margin: 0; font-size: 1.1rem;">项目列表</h3>
+                        <div class="search-filter-bar">
+                            <input type="text" id="projectSearchInput" placeholder="🔍 搜索项目名称..." class="search-input" onkeyup="filterProjectsTable()" style="width: 200px;">
+                        </div>
+                    </div>
+                    <table class="modern-table">
+                        <thead>
+                            <tr>
+                                <th width="30%">名称</th>
+                                <th width="40%">描述</th>
+                                <th width="20%">创建时间</th>
+                                <th class="text-right">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="project-list-body">
+                            {% for project in projects %}
+                            <tr data-name="{{ project.name }}">
+                                <td>
+                                    <a href="{{ url_for('project_detail', project_id=project.id) }}" class="project-link">
+                                        {{ project.name }}
+                                    </a>
+                                </td>
+                                <td class="table-cell-text">{{ project.description or '-' }}</td>
+                                <td>{{ project.create_on }}</td>
+                                <td class="text-right">
+                                    <div style="display: flex; justify-content: flex-end;">
+                                        <button class="btn-icon edit-btn" 
+                                            data-id="{{ project.id }}" 
+                                            data-name="{{ project.name }}" 
+                                            data-desc="{{ project.description or '' }}"
+                                            onclick="openEditModal(this)"
+                                            title="编辑项目">
+                                            ✏️
+                                        </button>
+                                    </div>
+                                </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="4" class="text-center">暂无项目，请先创建！</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                 </table>
+                 <!-- Pagination Container -->
+                 <div id="project-list-body-pagination"></div>
+            </div>
+            
+            <!-- Edit Modal -->
+            <div id="edit-modal" class="modal" onclick="closeEditModal()">
+                <div class="modal-content" onclick="event.stopPropagation()">
+                    <div class="modal-header">
+                        <h2>✏️ 编辑项目信息</h2>
+                        <button class="modal-close" onclick="closeEditModal()">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <input type="hidden" id="edit-id">
+                        <div class="form-group" style="margin-bottom: 1.5rem;">
+                            <label style="display:block; margin-bottom: 0.5rem; font-weight: 600; color: #334155;">项目名称</label>
+                            <input type="text" id="edit-name" class="input-modern" placeholder="请输入项目名称">
+                        </div>
+                        <div class="form-group" style="margin-bottom: 1.5rem;">
+                            <label style="display:block; margin-bottom: 0.5rem; font-weight: 600; color: #334155;">项目描述</label>
+                            <textarea id="edit-desc" class="input-modern" style="min-height: 100px; resize: vertical;" placeholder="请输入项目描述..."></textarea>
+                        </div>
+                        <div style="display: flex; justify-content: flex-end; gap: 1rem; margin-top: 1rem;">
+                            <button onclick="closeEditModal()" class="btn-action" style="padding: 0.75rem 1.5rem;">取消</button>
+                            <button onclick="saveEdit()" class="btn-primary" style="padding: 0.75rem 2rem;">🚀 保存修改</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            </div>
+        </main>
+    </div>
+
+<script>
+    function showToast(message, type = 'success') {
+        let container = document.getElementById('toast-container');
+        if (!container) {
+            container = document.createElement('div');
+            container.id = 'toast-container';
+            document.body.appendChild(container);
+        }
+        const toast = document.createElement('div');
+        toast.className = `toast toast-${type}`;
+        const icons = { success: '✅', error: '❌', warning: '⚠️' };
+        toast.innerHTML = `<span class="toast-icon">${icons[type]}</span><span class="toast-message">${message}</span>`;
+        container.appendChild(toast);
+        setTimeout(() => toast.classList.add('show'), 10);
+        setTimeout(() => {
+            toast.classList.remove('show');
+            setTimeout(() => toast.remove(), 300);
+        }, 3000);
+    }
+
+    // 项目创建现已统一通过“系统配置”页面进行同步管理，无需在此手动创建
+
+    // 项目删除已被禁用，项目管理请通过“系统配置”入口进行
+
+    function openEditModal(btn) {
+        const id = btn.dataset.id;
+        const name = btn.dataset.name;
+        const desc = btn.dataset.desc;
+        
+        document.getElementById('edit-id').value = id;
+        document.getElementById('edit-name').value = name;
+        document.getElementById('edit-desc').value = desc;
+        
+        const modal = document.getElementById("edit-modal");
+        modal.style.display = "flex";
+        setTimeout(() => modal.classList.add("show"), 10);
+    }
+
+    function closeEditModal() {
+        const modal = document.getElementById("edit-modal");
+        modal.classList.remove("show");
+        setTimeout(() => {
+            modal.style.display = "none";
+        }, 300);
+    }
+
+    function saveEdit() {
+        const id = document.getElementById('edit-id').value;
+        const name = document.getElementById('edit-name').value;
+        const desc = document.getElementById('edit-desc').value;
+        
+        if (!name) return alert("请输入项目名称");
+
+        fetch('/api/projects/' + id, {
+            method: 'PUT',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({name: name, description: desc})
+        })
+        .then(response => response.json())
+        .then(data => {
+            if(data.status === 'success') location.reload();
+            else alert("更新失败");
+        });
+    }
+
+    // Initialize pagination
+    let projectsPagination = null;
+    document.addEventListener('DOMContentLoaded', function() {
+        const tbody = document.getElementById('project-list-body');
+        if (tbody && tbody.getElementsByTagName('tr').length > 0) {
+            projectsPagination = new Pagination({
+                tableId: 'project-list-body',
+                itemsPerPage: 20
+            });
+            window.paginationInstances = window.paginationInstances || {};
+            window.paginationInstances['project-list-body'] = projectsPagination;
+        }
+    });
+
+    function filterProjectsTable() {
+        const input = document.getElementById("projectSearchInput");
+        const filter = input.value.toLowerCase();
+        const tbody = document.getElementById("project-list-body");
+        const rows = tbody.getElementsByTagName("tr");
+        const visibleRows = [];
+        
+        for (let row of rows) {
+            const name = row.getAttribute("data-name");
+            if (name) {
+                if (name.toLowerCase().includes(filter)) {
+                    row.style.display = "";
+                    visibleRows.push(row);
+                } else {
+                    row.style.display = "none";
+                }
+            }
+        }
+        
+        // Refresh pagination
+        if (projectsPagination) {
+            projectsPagination.refresh(visibleRows);
+        }
+    }
+</script>
+</body>
+</html>

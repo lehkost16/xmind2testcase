@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>{{ project.name }} | 项目详情</title>
+    <link rel="shortcut icon" href="{{ url_for('static',path='favicon.ico') }}" type="image/x-icon"/>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+    <link rel="stylesheet" type="text/css" media="all" href="{{ url_for('static',path='css/style.css') }}">
+    <script src="{{ url_for('static',path='js/pagination.js') }}" defer></script>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar">
+            <div class="brand">
+                <h1>X2T</h1>
+            </div>
+            <nav>
+                <a href="{{ url_for('index') }}" class="nav-item">
+                    <span class="icon">🏠</span> 首页仪表盘
+                </a>
+                <a href="{{ url_for('manage_projects') }}" class="nav-item active">
+                    <span class="icon">📂</span> 项目管理
+                </a>
+                <a href="{{ url_for('manage_configs') }}" class="nav-item">
+                    <span class="icon">⚙️</span> 系统配置
+                </a>
+            </nav>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <header class="top-bar" style="margin-bottom: 1.5rem; padding-bottom: 0.75rem;">
+                <div style="margin-bottom: 0.5rem;">
+                     <a href="{{ url_for('manage_projects') }}" style="color: var(--text-muted); font-size: 0.85rem; display: flex; align-items: center; gap: 0.25rem;">
+                         <span>&larr;</span> 返回项目列表
+                     </a>
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: flex-end;">
+                    <div>
+                        <h2 style="margin: 0;">{{ project.name }}</h2>
+                        <p style="color: var(--text-muted); margin: 0.25rem 0 0 0; font-size: 0.9rem;">{{ project.description or '无描述' }}</p>
+                    </div>
+                </div>
+            </header>
+
+            <div class="content-wrapper">
+                
+                <!-- Quick Upload Card for this Project -->
+                 <div class="card">
+                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+                        <h3 style="margin: 0; border: none; padding: 0;">上传文件到 {{ project.name }}</h3>
+                        <a href="{{ url_for('static', path='guide/XMind测试用例模板.xmind') }}" download="XMind测试用例模板.xmind" style="font-size: 0.85rem; color: var(--primary-color); text-decoration: none; display: flex; align-items: center; gap: 0.25rem; font-weight: 500;">
+                            📥 下载模板
+                        </a>
+                     </div>
+                    <form method="post" action="{{ url_for('upload_file') }}" enctype="multipart/form-data" class="upload-form">
+                        <input type="hidden" name="project_id" value="{{ project.id }}">
+                        
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem;">
+                            <div>
+                                <label for="case_type" style="display: block; margin-bottom: 0.5rem; font-weight: 500;">用例类型</label>
+                                <select name="case_type" id="case_type" class="input-modern" style="width: 100%;">
+                                    {% for ct in case_types %}
+                                        <option value="{{ ct }}" {% if loop.first %}selected{% endif %}>{{ ct }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+
+                            <div>
+                                <label for="apply_phase" style="display: block; margin-bottom: 0.5rem; font-weight: 500;">适用阶段</label>
+                                <select name="apply_phase" id="apply_phase" class="input-modern" style="width: 100%;">
+                                    {% for ap in apply_phases %}
+                                        <option value="{{ ap }}" {% if ap == '功能测试阶段' %}selected{% elif loop.first and '功能测试阶段' not in apply_phases %}selected{% endif %}>{{ ap }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+
+                        <label id="file-label" for="file" style="border: 2px dashed #cbd5e1; padding: 2rem; border-radius: 8px; background: #f8fafc; cursor: pointer; display: flex; flex-direction: column; align-items: center; transition: all 0.2s;">
+                            <span style="font-size: 1.5rem; margin-bottom: 0.5rem;">📁</span>
+                            <span id="file-display-name">点击选择 .xmind 文件</span>
+                        </label>
+                        <input id="file" accept=".xmind" type="file" name="file" class="hidden" required onchange="handleFileSelect(this)"/>
+                        <input id="submit-btn" type="submit" value="转换并上传" class="btn-primary" style="width: 100%; margin-top: 1.5rem;"/>
+                    </form>
+                 </div>
+
+                <!-- Project Files List -->
+                <div class="card table-card">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                        <h3 style="margin: 0;">项目文件列表</h3>
+                        <div class="search-filter-bar">
+                            <input type="text" id="fileSearchInput" placeholder="🔍 搜索文件名..." class="search-input" onkeyup="filterFilesTable()" style="width: 200px;">
+                        </div>
+                    </div>
+                    {% if records %}
+                    <table class="modern-table">
+                        <thead>
+                            <tr style="font-size: 0.95rem;">
+                                <th style="width: 50%;">文件名</th>
+                                <th>时间</th>
+                                <th class="text-right">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="filesTableBody">
+                            {% for record in records %}
+                            <tr data-filename="{{ record.name }}">
+                                <td title="{{ record.name }}">
+                                    <span class="table-cell-text" style="font-weight: 500;">{{ record.short_name }}</span>
+                                    {% if record.note %}
+                                    <div style="color: var(--text-muted); font-size: 0.8rem; margin-top: 0.2rem;">{{ record.note }}</div>
+                                    {% endif %}
+                                </td>
+                                <td class="time-cell">{{ record.create_on }}</td>
+                                <td class="text-right">
+                                    <div class="action-buttons" style="justify-content: flex-end;">
+                                        <a href="{{ url_for('preview_record', record_id=record.id) }}" 
+                                           class="btn-action btn-action-preview" 
+                                           title="在线预览/编辑">
+                                            <span class="btn-icon">👁️</span>
+                                            <span class="btn-text">预览</span>
+                                        </a>
+
+                                        {% if settings.ENABLE_ZENTAO %}
+                                        <a href="{{ url_for('download_zentao_file',filename=record.name) }}" 
+                                           class="btn-action" 
+                                           title="导出禅道 CSV">
+                                            <span class="btn-icon">📊</span>
+                                            <span class="btn-text">禅道</span>
+                                        </a>
+                                        {% endif %}
+                                        {% if settings.ENABLE_TESTLINK %}
+                                        <a href="{{ url_for('download_testlink_file',filename=record.name) }}" 
+                                           class="btn-action" 
+                                           title="导出 TestLink XML">
+                                            <span class="btn-icon">📄</span>
+                                            <span class="btn-text">TestLink</span>
+                                        </a>
+                                        {% endif %}
+                                        <a href="{{ url_for('download_xmind_file',filename=record.name) }}" 
+                                           class="btn-action" 
+                                           title="导出 XMind">
+                                            <span class="btn-icon">📥</span>
+                                            <span class="btn-text">XMind</span>
+                                        </a>
+                                        <button class="btn-action btn-action-delete" 
+                                            data-id="{{ record.id }}"
+                                            data-name="{{ record.name | e }}"
+                                            onclick="deleteRecord(this.dataset.id, this.dataset.name)"
+                                            title="删除记录">
+                                            <span class="btn-icon">🗑️</span>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                    <div id="noFilesResults" style="display: none; text-align: center; padding: 2rem; color: var(--text-muted);">
+                        😕 没有找到匹配的文件
+                    </div>
+                    <!-- Pagination Container -->
+                    <div id="filesTableBody-pagination"></div>
+                    {% else %}
+                    <div style="text-align: center; color: var(--text-muted); padding: 2rem;">
+                        暂无文件，请在上方上传！
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </main>
+    </div>
+    
+    <script>
+    document.getElementById("file").addEventListener("change", function () {
+        if (this.value) {
+            document.getElementById("file-label").innerHTML = `
+                <span style="color: var(--primary-color); font-weight: 600;">✅ ${this.value.split("\\").pop()}</span>
+            `;
+            document.getElementById("file-label").style.borderColor = "var(--primary-color)";
+            document.getElementById("file-label").style.background = "#eff6ff";
+        }
+    });
+
+    // Initialize pagination
+    let filesPagination = null;
+    document.addEventListener('DOMContentLoaded', function() {
+        const tbody = document.getElementById('filesTableBody');
+        if (tbody && tbody.getElementsByTagName('tr').length > 0) {
+            filesPagination = new Pagination({
+                tableId: 'filesTableBody',
+                itemsPerPage: 20
+            });
+            window.paginationInstances = window.paginationInstances || {};
+            window.paginationInstances['filesTableBody'] = filesPagination;
+        }
+    });
+
+    function filterFilesTable() {
+        const input = document.getElementById("fileSearchInput");
+        const filter = input.value.toLowerCase();
+        const tbody = document.getElementById("filesTableBody");
+        const rows = tbody.getElementsByTagName("tr");
+        const noResults = document.getElementById("noFilesResults");
+        let visibleCount = 0;
+        const visibleRows = [];
+
+        for (let row of rows) {
+            const filename = row.getAttribute("data-filename").toLowerCase();
+            if (filename.includes(filter)) {
+                row.style.display = "";
+                visibleCount++;
+                visibleRows.push(row);
+            } else {
+                row.style.display = "none";
+            }
+        }
+
+        if (visibleCount === 0) {
+            tbody.parentElement.style.display = "none";
+            noResults.style.display = "block";
+        } else {
+            tbody.parentElement.style.display = "table";
+            noResults.style.display = "none";
+        }
+        
+        // Refresh pagination
+        if (filesPagination) {
+            filesPagination.refresh(visibleRows);
+        }
+    }
+
+    async function deleteRecord(id, name) {
+        if (!confirm(`确定要删除文件 "${name}" 吗？\n删除后无法恢复。`)) {
+            return;
+        }
+        
+        try {
+            const response = await fetch(`/api/records/${id}`, {
+                method: 'DELETE'
+            });
+            
+            if (response.ok) {
+                // Show success message and reload
+                const toast = document.createElement('div');
+                toast.className = 'toast toast-success show';
+                toast.innerHTML = `<span class="toast-icon">✅</span> 文件 "${name}" 已删除`;
+                document.body.appendChild(toast);
+                
+                setTimeout(() => {
+                    window.location.reload();
+                }, 1000);
+            } else {
+                alert('删除失败，请重试');
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            alert('操作失败，请重试');
+        }
+    }
+        function handleFileSelect(input) {
+        const displayName = document.getElementById('file-display-name');
+        const fileLabel = document.getElementById('file-label');
+        if (input.files && input.files.length > 0) {
+            displayName.innerText = "已选择: " + input.files[0].name;
+            displayName.style.color = "var(--primary-color)";
+            fileLabel.style.borderColor = "var(--primary-color)";
+            fileLabel.style.background = "#eff6ff";
+        }
+    }
+</script>
+</body>
+</html>

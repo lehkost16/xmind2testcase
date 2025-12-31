@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>{{ name }} | Xmind2TestCase 预览</title>
+    <link rel="shortcut icon" href="{{ url_for('static',path='favicon.ico') }}" type="image/x-icon"/>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+    <link rel="stylesheet" type="text/css" media="all" href="{{ url_for('static',path='css/style.css') }}">
+</head>
+<body>
+    <div class="header">
+        <div class="content-wrapper">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                     <!-- Breadcrumb / Back -->
+                    <div style="margin-bottom: 0.5rem;">
+                        {% if project_id %}
+                         <a href="{{ url_for('project_detail', project_id=project_id) }}" style="color: var(--text-muted); font-size: 0.9rem;">&larr; 返回项目</a>
+                        {% else %}
+                         <a href="{{ url_for('index') }}" style="color: var(--text-muted); font-size: 0.9rem;">&larr; 返回首页</a>
+                        {% endif %}
+                    </div>
+                    <h1>
+                        <span id="record-name-display">{{ name }}</span>
+                        <input type="text" id="record-name-input" value="{{ name }}" style="display:none; width: auto;" class="input-modern">
+                        <button onclick="toggleEditName()" class="btn-icon" title="重命名">✏️</button>
+                    </h1>
+                    <h2 style="font-size: 1rem; color: var(--text-muted); font-weight: normal; margin-top: 0.5rem;">
+                        测试套件: <strong>{{ suite_count }}</strong> &middot; 测试用例: <strong>{{ suite | length }}</strong>
+                    </h2>
+                </div>
+                <div style="display: flex; gap: 0.75rem;">
+                    <button onclick="saveRecord()" class="btn-primary">保存结果</button>
+                    <button onclick="copyExecutionResults()" class="pure-button" title="复制执行结果汇总">
+                        📋 复制执行结果
+                    </button>
+                </div>
+            </div>
+            <div style="margin-top: 1.5rem; display: flex; gap: 1rem;">
+                {% if settings.ENABLE_ZENTAO %}
+                <a href="{{ url_for('download_zentao_file',filename= name) }}" class="btn-action">
+                    <span class="btn-icon">📊</span>
+                    <span class="btn-text">导出禅道 CSV</span>
+                </a>
+                {% endif %}
+                {% if settings.ENABLE_TESTLINK %}
+                <a href="{{ url_for('download_testlink_file',filename= name) }}" class="btn-action">
+                    <span class="btn-icon">📄</span>
+                    <span class="btn-text">导出 TestLink XML</span>
+                </a>
+                {% endif %}
+                <a href="{{ url_for('download_xmind_file',filename= name) }}" class="btn-action">
+                    <span class="btn-icon">📥</span>
+                    <span class="btn-text">导出 XMind</span>
+                </a>
+            </div>
+        </div>
+    </div>
+
+<div class="content-wrapper">
+    <input type="hidden" id="record-id" value="{{ record_id }}">
+    
+    <div class="card" style="padding: 0; overflow: hidden;">
+    <table class="pure-table tests-table" style="width: 100%; border: none; margin: 0;">
+        <thead>
+        <tr>
+            <th width="60px" class="text-center">#</th>
+            <th width="15%">模块/套件</th>
+            <th>用例标题</th>
+            <th width="150px">属性</th>
+            <th width="25%">步骤 & 预期</th>
+            <th width="12%">执行结果</th>
+        </tr>
+        </thead>
+        <tbody>
+        {% for test in suite %}
+            {% set case_index = loop.index0 %}
+            <tr>
+                <td class="text-center">{{ loop.index }}</td>
+                <td style="font-weight: 500;">{{ test.suite }}</td>
+                <td>
+                    <div contenteditable="true" class="editable-cell" data-index="{{ case_index }}" data-field="name" data-placeholder="请输入用例标题...">{{ test.name }}</div>
+                    {% if test.name|length>100 %}
+                        <div class="long-name-info">⚠️ 名称过长</div>
+                    {% endif %}
+                </td>
+                <td>
+                    <div class="tag-success">P{{ test.importance }}</div>
+                    {% if test.preconditions %}
+                        <div class="tooltip" style="display:inline-block; margin-top: 5px;">
+                            <span class="tag-info" style="cursor:help;">前置条件</span>
+                            <span class="tooltiptext">
+                                <strong>前置条件:</strong><br>
+                                {{ test.preconditions | replace('\n','<br>') |safe }}
+                            </span>
+                        </div>
+                    {% endif %}
+                    {% if test.summary %}
+                        <div class="tooltip" style="display:inline-block; margin-top: 5px;">
+                            <span class="tag-warn" style="cursor:help;">摘要</span>
+                            <span class="tooltiptext">
+                                <strong>摘要:</strong><br>
+                                {{ test.summary | replace('\n','<br>') |safe }}
+                            </span>
+                        </div>
+                    {% endif %}
+                </td>
+                <td style="font-size: 0.9em; color: #4b5563;">
+                    {% if test.steps %}
+                        <ol style="padding-left: 1.2rem; margin: 0;">
+                            {% for step in test.steps %}
+                                <li style="margin-bottom: 0.75rem;">
+                                    <div contenteditable="true" class="editable-step" data-index="{{ case_index }}" data-step-index="{{ loop.index0 }}" data-type="action" data-placeholder="请输入测试步骤...">{{ step.actions }}</div>
+                                    {% if step.expectedresults %}
+                                        <div style="font-style: italic; color: #6b7280; margin-top: 4px; display: flex; align-items: flex-start;">
+                                            <span style="margin-right: 8px; color: #94a3b8; font-weight: bold; margin-top: 6px;">&rdsh;</span>
+                                            <div contenteditable="true" class="editable-step" data-index="{{ case_index }}" data-step-index="{{ loop.index0 }}" data-type="expected" style="flex: 1;" data-placeholder="请输入预期结果...">{{ step.expectedresults }}</div>
+                                        </div>
+                                    {% endif %}
+                                </li>
+                            {% endfor %}
+                        </ol>
+                    {% else %}
+                        <ol style="padding-left: 1.2rem; margin: 0;"></ol>
+                    {% endif %}
+                    <button class="btn-add-step" onclick="addStep({{ case_index }}, this)">
+                        <span>➕</span> 增加步骤
+                    </button>
+                </td>
+                <td>
+                    <select class="result-select input-modern" data-index="{{ loop.index0 }}" style="padding: 0.25rem 0.5rem; font-size: 0.85rem; margin-bottom: 0.25rem;">
+                        <option value="Not Run" {% if test.result == 'Not Run' %}selected{% endif %}>未执行</option>
+                        <option value="Pass" {% if test.result == 'Pass' %}selected{% endif %}>通过</option>
+                        <option value="Fail" {% if test.result == 'Fail' %}selected{% endif %}>失败</option>
+                        <option value="Block" {% if test.result == 'Block' %}selected{% endif %}>阻塞</option>
+                        <option value="Skip" {% if test.result == 'Skip' %}selected{% endif %}>跳过</option>
+                    </select>
+                </td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    </div>
+
+</div>
+
+<style>
+    .editable-cell, .editable-step {
+        padding: 6px 10px;
+        border: 1.5px solid transparent;
+        border-radius: 6px;
+        transition: all 0.2s ease;
+        background-color: transparent;
+        cursor: text;
+    }
+
+    .editable-cell:hover, .editable-step:hover {
+        background-color: #f8fafc;
+        border-color: #e2e8f0;
+    }
+
+    .editable-cell:focus, .editable-step:focus {
+        border-color: var(--primary-color) !important;
+        background-color: #ffffff;
+        box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);
+        outline: none;
+        z-index: 10;
+        position: relative;
+    }
+
+    [contenteditable=true]:empty:before {
+        content: attr(data-placeholder);
+        color: #94a3b8;
+        font-style: italic;
+    }
+
+    .tests-table td {
+        vertical-align: top;
+        padding: 1.25rem 1rem;
+    }
+
+    .editable-cell[data-field="name"] {
+        font-weight: 600;
+        color: #1e293b;
+        font-size: 1.05rem;
+    }
+
+    .editable-step {
+        font-size: 0.95rem;
+        line-height: 1.5;
+        margin-bottom: 2px;
+    }
+
+    .result-select {
+        height: 32px;
+        min-width: 100px;
+    }
+
+    .btn-add-step {
+        background: #f1f5f9;
+        border: 1px dashed #cbd5e1;
+        color: #64748b;
+        padding: 0.4rem 0.75rem;
+        border-radius: 6px;
+        font-size: 0.8rem;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.2s;
+        display: flex;
+        align-items: center;
+        gap: 0.3rem;
+        margin-top: 0.75rem;
+    }
+
+    .btn-add-step:hover {
+        background: #e2e8f0;
+        color: var(--primary-color);
+        border-style: solid;
+        border-color: var(--primary-color);
+    }
+</style>
+
+<script>
+    const recordId = document.getElementById('record-id').value;
+    const testCases = {{ suite | tojson | safe }};
+
+    function toggleEditName() {
+        const display = document.getElementById('record-name-display');
+        const input = document.getElementById('record-name-input');
+        if (input.style.display === 'none') {
+            input.style.display = 'inline-block';
+            display.style.display = 'none';
+            input.focus();
+            input.select(); // Select all text for easy editing
+        } else {
+            saveNameOnly(); // Auto-save when toggling back to display mode
+        }
+    }
+
+    function saveNameOnly() {
+        if (!recordId || recordId === 'None') {
+            alert("No record ID found. Cannot save.");
+            return;
+        }
+
+        const display = document.getElementById('record-name-display');
+        const input = document.getElementById('record-name-input');
+        const newName = input.value.trim();
+
+        if (!newName) {
+            alert('文件名不能为空');
+            input.value = display.innerText; // Restore original name
+            return;
+        }
+
+        // Update display immediately for better UX
+        input.style.display = 'none';
+        display.innerText = newName;
+        display.style.display = 'inline';
+
+        // Save to backend
+        fetch(`/api/records/${recordId}`, {
+            method: 'PUT',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                name: newName
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                // Show brief success indicator
+                const originalColor = display.style.color;
+                display.style.color = '#10b981';
+                setTimeout(() => {
+                    display.style.color = originalColor;
+                }, 1000);
+            } else {
+                alert('保存文件名失败');
+                // Could revert the display here if needed
+            }
+        })
+        .catch(err => {
+            console.error(err);
+            alert('保存文件名时出错');
+        });
+    }
+
+    // Add event listeners after DOM loads
+    document.addEventListener('DOMContentLoaded', function() {
+        const input = document.getElementById('record-name-input');
+        
+        // Save on Enter key
+        input.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                toggleEditName();
+            } else if (e.key === 'Escape') {
+                // Cancel editing on Escape
+                const display = document.getElementById('record-name-display');
+                input.value = display.innerText; // Restore original value
+                input.style.display = 'none';
+                display.style.display = 'inline';
+            }
+        });
+
+        // Save on blur (clicking outside)
+        input.addEventListener('blur', function() {
+            // Small delay to allow click events to process first
+            setTimeout(() => {
+                if (input.style.display !== 'none') {
+                    toggleEditName();
+                }
+            }, 100);
+        });
+    });
+
+    function saveRecord() {
+        if (!recordId || recordId === 'None') {
+            alert("No record ID found. Cannot save.");
+            return;
+        }
+
+        const newName = document.getElementById('record-name-input').value;
+        const resultSelects = document.querySelectorAll('.result-select');
+        const editableCells = document.querySelectorAll('.editable-cell[data-field="name"]');
+        const editableSteps = document.querySelectorAll('.editable-step');
+        
+        // Update Results
+        resultSelects.forEach(select => {
+            const index = select.getAttribute('data-index');
+            testCases[index].result = select.value;
+        });
+
+        // Update Titles
+        editableCells.forEach(cell => {
+             const index = cell.getAttribute('data-index');
+             testCases[index].name = cell.innerText.trim();
+        });
+
+        // Update Steps
+        editableSteps.forEach(stepDiv => {
+             // data-index is the CASE index (loop.parent.loop.index0 or loop.index0)
+             // data-step-index is the STEP index within the case
+             const caseIndex = stepDiv.getAttribute('data-index');
+             const stepIndex = stepDiv.getAttribute('data-step-index');
+             const type = stepDiv.getAttribute('data-type');
+             
+             if (testCases[caseIndex] && testCases[caseIndex].steps && testCases[caseIndex].steps[stepIndex]) {
+                 if (type === 'action') {
+                     testCases[caseIndex].steps[stepIndex].actions = stepDiv.innerText.trim();
+                 } else if (type === 'expected') {
+                     testCases[caseIndex].steps[stepIndex].expectedresults = stepDiv.innerText.trim();
+                 }
+             }
+        });
+
+        fetch(`/api/records/${recordId}`, {
+            method: 'PUT',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                name: newName,
+                content: testCases
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                const btn = document.querySelector('button[onclick="saveRecord()"]');
+                const originalText = btn.innerText;
+                btn.innerText = "已保存!";
+                btn.style.background = "#10b981"; 
+                setTimeout(() => {
+                    btn.innerText = originalText;
+                    btn.style.background = "";
+                }, 2000);
+                
+                document.getElementById('record-name-display').innerText = newName;
+            } else {
+                alert('保存失败');
+            }
+        })
+        .catch(err => {
+            console.error(err);
+            alert('Error saving.');
+        });
+    }
+
+    function addStep(caseIndex, btn) {
+        // Ensure steps array exists
+        if (!testCases[caseIndex].steps) {
+            testCases[caseIndex].steps = [];
+        }
+        
+        const stepIndex = testCases[caseIndex].steps.length;
+        const newStep = {
+            step_number: stepIndex + 1,
+            actions: "",
+            expectedresults: "",
+            execution_type: 1
+        };
+        testCases[caseIndex].steps.push(newStep);
+
+        // Find the OL or create one if it doesn't exist (though template handles checking if steps exist, if empty list initially...)
+        let ol = btn.previousElementSibling;
+        if (ol.tagName !== 'OL') {
+             // Handle obscure case where OL might be missing
+             console.warn("OL element not found for adding step");
+        }
+
+        const li = document.createElement('li');
+        li.style.marginBottom = "0.5rem";
+        
+        li.innerHTML = `
+            <div contenteditable="true" class="editable-step" data-index="${caseIndex}" data-step-index="${stepIndex}" data-type="action" data-placeholder="请输入测试步骤..."></div>
+            <div style="font-style: italic; color: #6b7280; margin-top: 4px; display: flex; align-items: flex-start;">
+                <span style="margin-right: 8px; color: #94a3b8; font-weight: bold; margin-top: 6px;">&rdsh;</span>
+                <div contenteditable="true" class="editable-step" data-index="${caseIndex}" data-step-index="${stepIndex}" data-type="expected" style="flex: 1;" data-placeholder="请输入预期结果..."></div>
+            </div>
+        `;
+        
+        if (ol) ol.appendChild(li);
+    }
+
+    function copyExecutionResults() {
+        if (!recordId || recordId === 'None') return;
+
+        fetch(`/api/records/${recordId}/export`)
+            .then(res => res.text())
+            .then(text => {
+                // Copy to clipboard
+                navigator.clipboard.writeText(text).then(() => {
+                    const btn = document.querySelector('button[onclick="copyExecutionResults()"]');
+                    const originalText = btn.innerHTML;
+                    btn.innerHTML = "✅ 已复制";
+                    setTimeout(() => {
+                        btn.innerHTML = originalText;
+                    }, 2000);
+                }, (err) => {
+                    console.error('Could not copy text: ', err);
+                    alert("复制失败，请手动下载");
+                });
+            });
+    }
+</script>
+</body>
+</html>

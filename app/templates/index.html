@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>Dashboard | XMind2TestCase</title>
+    <link rel="shortcut icon" href="{{ url_for('static',path='favicon.ico') }}" type="image/x-icon"/>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap">
+    <link rel="stylesheet" type="text/css" media="all" href="{{ url_for('static',path='css/style.css') }}">
+    <script src="{{ url_for('static',path='js/pagination.js') }}" defer></script>
+    <script type="module">
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+        mermaid.initialize({ startOnLoad: true, theme: 'neutral' });
+    </script>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar">
+            <div class="brand">
+                <h1>X2T</h1>
+            </div>
+            <nav>
+                <a href="{{ url_for('index') }}" class="nav-item active">
+                    <span class="icon">🏠</span> 首页仪表盘
+                </a>
+                <a href="{{ url_for('manage_projects') }}" class="nav-item">
+                    <span class="icon">📂</span> 项目管理
+                </a>
+                <a href="{{ url_for('manage_configs') }}" class="nav-item">
+                    <span class="icon">⚙️</span> 系统配置
+                </a>
+            </nav>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <header class="top-bar">
+                <h2>首页仪表盘</h2>
+            </header>
+
+            <div class="content-wrapper">
+                
+                <!-- Statistics Dashboard -->
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-icon">📊</div>
+                        <div class="stat-content">
+                            <div class="stat-value">{{ stats.today_count if stats else 0 }}</div>
+                            <div class="stat-label">今日转换</div>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">📅</div>
+                        <div class="stat-content">
+                            <div class="stat-value">{{ stats.week_count if stats else 0 }}</div>
+                            <div class="stat-label">本周转换</div>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">✅</div>
+                        <div class="stat-content">
+                            <div class="stat-value">{{ stats.total_records if stats else 0 }}</div>
+                            <div class="stat-label">总转换数</div>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">📂</div>
+                        <div class="stat-content">
+                            <div class="stat-value">{{ projects|length }}</div>
+                            <div class="stat-label">项目数量</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Integrated Premium Upload Card -->
+                <div class="card" style="padding: 2.5rem; border-radius: 20px; border: 1px solid var(--card-border); background: #ffffff; box-shadow: 0 10px 40px -10px rgba(0,0,0,0.05); transition: transform 0.3s ease;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 2.5rem;">
+                         <h3 style="margin: 0; border: none; padding: 0; font-size: 1.5rem; font-weight: 700; color: #1e293b; display: flex; align-items: center; gap: 0.75rem;">
+                            <span style="background: var(--primary-color); color: white; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; border-radius: 10px; font-size: 1.1rem; box-shadow: 0 4px 10px rgba(59, 130, 246, 0.3);">1</span>
+                            转换配置
+                        </h3>
+                        <div style="display: flex; align-items: center; gap: 1rem;">
+                            <button class="btn-guide" onclick="openGuideModal()" style="padding: 0.6rem 1.2rem; font-size: 0.9rem; border-radius: 8px; box-shadow: none; background: #f1f5f9; color: #475569; border: 1px solid #e2e8f0;">
+                                📖 编写规范
+                            </button>
+                            <a href="{{ url_for('static', path='guide/XMind测试用例模板.xmind') }}" download="XMind测试用例模板.xmind" style="font-size: 0.85rem; color: var(--primary-color); text-decoration: none; display: flex; align-items: center; gap: 0.25rem; font-weight: 600; background: #eff6ff; padding: 0.5rem 1rem; border-radius: 8px; border: 1px solid #dbeafe;">
+                                📥 下载模板
+                            </a>
+                        </div>
+                    </div>
+
+                    <form method="post" enctype="multipart/form-data" class="upload-form">
+                        <div class="upload-form-grid">
+                            <!-- Left Side: Config -->
+                            <div style="display: flex; flex-direction: column; gap: 1.75rem;">
+                                <div class="form-group">
+                                    <label for="project_id" style="display:block; margin-bottom: 0.6rem; color: #334155; font-weight: 600; font-size: 0.95rem;">
+                                        所属项目 <span style="color: #ef4444;">*</span>
+                                    </label>
+                                    <select name="project_id" id="project_id" class="input-modern" style="height: 50px; border-radius: 12px;" required>
+                                        <option value="" disabled selected>-- 请选择目标项目 --</option>
+                                        {% for project in projects %}
+                                            <option value="{{ project.id }}">{{ project.name }}</option>
+                                        {% endfor %}
+                                    </select>
+                                    {% if not projects %}
+                                        <div style="margin-top: 0.5rem; color: #ef4444; font-size: 0.85em; display: flex; align-items: center; gap: 0.25rem;">
+                                            <span>⚠️</span> 暂无项目，请先前往 <a href="{{ url_for('manage_configs') }}">系统配置</a> 添加。
+                                        </div>
+                                    {% endif %}
+                                </div>
+
+                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                                    <div class="form-group">
+                                        <label for="case_type" style="display:block; margin-bottom: 0.6rem; color: #334155; font-weight: 600; font-size: 0.95rem;">用例类型</label>
+                                        <select name="case_type" id="case_type" class="input-modern" style="height: 50px; border-radius: 12px;">
+                                            {% for ct in case_types %}
+                                                <option value="{{ ct }}" {% if loop.first %}selected{% endif %}>{{ ct }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="apply_phase" style="display:block; margin-bottom: 0.6rem; color: #334155; font-weight: 600; font-size: 0.95rem;">适用阶段</label>
+                                        <select name="apply_phase" id="apply_phase" class="input-modern" style="height: 50px; border-radius: 12px;">
+                                            {% for ap in apply_phases %}
+                                                <option value="{{ ap }}" {% if ap == '功能测试阶段' %}selected{% elif loop.first and '功能测试阶段' not in apply_phases %}selected{% endif %}>{{ ap }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                </div>
+                                
+                                <div style="margin-top: 0.5rem; padding: 1.25rem; background: #f8fafc; border-radius: 12px; border-left: 4px solid var(--primary-color); position: relative; overflow: hidden;">
+                                    <div style="position: absolute; right: -10px; bottom: -10px; font-size: 3rem; opacity: 0.05;">💡</div>
+                                    <p style="margin: 0; font-size: 0.85rem; color: #475569; line-height: 1.6;">
+                                        <strong>提示：</strong>所选配置将直接录入转换后的文件中。建议先下载模板以确保 XMind 节点层级符合转换规范。
+                                    </p>
+                                </div>
+                            </div>
+
+                            <!-- Right Side: Dropzone -->
+                            <div style="display: flex; flex-direction: column; gap: 1.75rem;">
+                                <div class="upload-section">
+                                    <label style="display:block; margin-bottom: 0.6rem; color: #334155; font-weight: 600; font-size: 0.95rem;">
+                                        文件上传 <span style="font-weight: normal; color: #94a3b8; font-size: 0.85rem;">(仅限 .xmind)</span>
+                                    </label>
+                                    <label id="file-label" for="file" style="min-height: 180px; border: 2px dashed #cbd5e1; border-radius: 16px; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; background: #fbfcfd;">
+                                        <span class="upload-icon" style="font-size: 3.5rem; margin-bottom: 0.75rem; filter: drop-shadow(0 4px 6px rgba(0,0,0,0.05));">☁️</span>
+                                        <span class="upload-text" id="file-display-name" style="font-size: 1.1rem; font-weight: 600; color: #475569;">点击或将文件拖入此处</span>
+                                        <span class="upload-hint" style="font-size: 0.85rem; color: #94a3b8; margin-top: 0.4rem;">更快捷的转换体验</span>
+                                    </label>
+                                    <input id="file" accept=".xmind" type="file" name="file" class="hidden" required/>
+                                </div>
+
+                                <input id="submit-btn" type="submit" value="🚀 开始转换旅程" class="btn-primary" 
+                                    style="width: 100%; height: 56px; font-size: 1.15rem; border-radius: 14px; font-weight: 600; cursor: pointer; box-shadow: 0 10px 20px -5px rgba(59, 130, 246, 0.3); transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);">
+                            </div>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- <div style="height: 3rem;"></div>
+
+                <div style="height: 3rem;"></div>
+ -->
+
+                <!-- Guide Modal -->
+                <div id="guideModal" class="modal" onclick="closeGuideModal()">
+                    <div class="modal-content" onclick="event.stopPropagation()">
+                        <div class="modal-header">
+                            <h2>📝 XMind 编写规范指南</h2>
+                            <button class="modal-close" onclick="closeGuideModal()">&times;</button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="guide-intro">
+                                <p style="font-size: 1rem; color: var(--text-color); line-height: 1.6;">
+                                    为了确保 XMind 文件能够正确解析为测试用例，请严格遵循以下层级结构。
+                                    每个层级都有其特定的含义和作用。
+                                </p>
+                            </div>
+
+                            <div class="guide-section" style="background: #f0f7ff; padding: 1.5rem; border-radius: 12px; margin-bottom: 2rem; border: 1px solid #dbeafe; display: flex; align-items: center; justify-content: space-between;">
+                                <div style="flex: 1;">
+                                    <h3 style="margin: 0 0 0.5rem 0; border: none; padding: 0; color: #1e40af; display: flex; align-items: center; gap: 0.5rem;">
+                                        🚀 快速开始 <span style="font-size: 0.75rem; background: #3b82f6; color: white; padding: 2px 8px; border-radius: 20px;"></span>
+                                    </h3>
+                                    <p style="margin: 0 0 0.75rem 0; color: #3b82f6; font-size: 0.95rem;">下载最新标准 XMind 模板，支持：</p>
+                                    <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                                        <span style="font-size: 0.75rem; background: #dbeafe; color: #1e40af; padding: 2px 8px; border-radius: 4px; font-weight: 500;">⭐ 优先级标记</span>
+                                        <span style="font-size: 0.75rem; background: #dbeafe; color: #1e40af; padding: 2px 8px; border-radius: 4px; font-weight: 500;">📝 笔记=前置条件</span>
+                                        <span style="font-size: 0.75rem; background: #dbeafe; color: #1e40af; padding: 2px 8px; border-radius: 4px; font-weight: 500;">📑 标签=自动化类型</span>
+                                    </div>
+                                </div>
+                                <a href="{{ url_for('static', path='guide/XMind测试用例模板.xmind') }}" download="XMind测试用例模板.xmind" class="btn-primary" style="background: #2563eb; padding: 0.75rem 1.5rem; text-decoration: none; display: flex; align-items: center; gap: 0.5rem; border-radius: 10px; font-weight: 600;">
+                                    📥 下载官方模板
+                                </a>
+                            </div>
+
+                            <div class="guide-section">
+                                <h3>🔍 层级说明</h3>
+                                <div class="guide-levels">
+                                    <div class="level-item">
+                                        <div class="level-badge level-1">第 0 层</div>
+                                        <div class="level-content">
+                                            <h4>中心主题 - 测试模块</h4>
+                                            <p>代表整个测试模块或项目的名称，例如："用户管理模块"、"订单系统测试"</p>
+                                            <div class="example">
+                                                <strong>示例：</strong><code>电商平台-购物车功能测试</code>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="level-item">
+                                        <div class="level-badge level-2">第 1 层</div>
+                                        <div class="level-content">
+                                            <h4>测试套件 (Test Suite)</h4>
+                                            <p>中心主题的第一级子节点，用于组织相关的测试用例，通常按功能模块划分</p>
+                                            <div class="example">
+                                                <strong>示例：</strong><code>添加商品到购物车</code>、<code>修改购物车数量</code>、<code>删除购物车商品</code>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="level-item">
+                                        <div class="level-badge level-3">第 2 层</div>
+                                        <div class="level-content">
+                                            <h4>测试用例标题 (Test Case)</h4>
+                                            <p>具体的测试场景描述，应该清晰说明要测试什么</p>
+                                            <div class="example">
+                                                <strong>示例：</strong><code>正常添加单个商品</code>、<code>添加已售罄商品</code>、<code>添加超过库存数量</code>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="level-item">
+                                        <div class="level-badge level-4">第 3 层</div>
+                                        <div class="level-content">
+                                            <h4>测试步骤 (Test Step)</h4>
+                                            <p>执行测试的具体操作步骤，应该详细且可执行</p>
+                                            <div class="example">
+                                                <strong>示例：</strong><code>1. 登录系统</code>、<code>2. 浏览商品列表</code>、<code>3. 点击"加入购物车"按钮</code>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="level-item">
+                                        <div class="level-badge level-5">第 4 层</div>
+                                        <div class="level-content">
+                                            <h4>预期结果 (Expected Result)</h4>
+                                            <p>每个步骤对应的预期结果，用于验证功能是否正常</p>
+                                            <div class="example">
+                                                <strong>示例：</strong><code>显示登录成功提示</code>、<code>购物车图标显示数量+1</code>、<code>商品成功添加到购物车列表</code>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="guide-section">
+                                <h3>✅ 最佳实践</h3>
+                                <ul class="best-practices">
+                                    <li><strong>保持层级清晰：</strong>严格按照 5 层结构组织，不要跳层或混乱层级</li>
+                                    <li><strong>命名规范：</strong>使用清晰、简洁的中文描述，避免使用特殊符号</li>
+                                    <li><strong>步骤详细：</strong>每个测试步骤应该足够详细，让任何人都能执行</li>
+                                    <li><strong>结果明确：</strong>预期结果要具体可验证，避免模糊描述</li>
+                                    <li><strong>逻辑完整：</strong>确保测试用例覆盖正常流程和异常情况</li>
+                                </ul>
+                            </div>
+
+                            <div class="guide-section">
+                                <h3>⚠️ 常见错误</h3>
+                                <ul class="common-errors">
+                                    <li>❌ 层级混乱，将步骤直接放在套件下</li>
+                                    <li>❌ 缺少预期结果，只有操作步骤</li>
+                                    <li>❌ 用例标题过于笼统，无法明确测试目标</li>
+                                    <li>❌ 步骤描述不清晰，缺少必要的操作细节</li>
+                                </ul>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button class="btn-primary" onclick="closeGuideModal()">我知道了</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Recent Records -->
+                {% if records %}
+                <div class="card table-card">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+                        <h3 style="margin: 0;">最近转换记录</h3>
+                        <div class="search-filter-bar">
+                            <input type="text" id="searchInput" placeholder="🔍 搜索文件名..." class="search-input" onkeyup="filterTable()">
+                            <select id="projectFilter" class="filter-select" onchange="filterTable()">
+                                <option value="">全部项目</option>
+                                {% for project in projects %}
+                                    <option value="{{ project.name }}">{{ project.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                    <table class="modern-table recent-xminds">
+                        <thead>
+                        <tr style="font-size: 0.95rem;">
+                            <th>所属项目</th>
+                            <th style="width: 35%;">文件名</th>
+                            <th>时间</th>
+                            <th class="text-right">操作</th>
+                        </tr>
+                        </thead>
+                        <tbody id="recordsTableBody">
+                        {% for record in records %}
+                            <tr data-project="{{ record.project_name }}" data-filename="{{ record.name }}">
+                                <td>
+                                    {% if record.project_id %}
+                                        <a href="{{ url_for('project_detail', project_id=record.project_id) }}" class="project-link">{{ record.project_name }}</a>
+                                    {% else %}
+                                        <span class="text-muted">{{ record.project_name }}</span>
+                                    {% endif %}
+                                </td>
+                                <td title="{{ record.name }}" class="table-cell-text"> {{ record.short_name }}</td>
+                                <td class="time-cell">{{ record.create_on }}</td>
+                                <td class="text-right">
+                                    <div class="action-buttons" style="justify-content: flex-end;">
+                                        <a href="{{ url_for('preview_record', record_id=record.id) }}" 
+                                           class="btn-action btn-action-preview" 
+                                           title="在线预览">
+                                            <span class="btn-icon">👁️</span>
+                                            <span class="btn-text">预览</span>
+                                        </a>
+                                        {% if settings.ENABLE_ZENTAO %}
+                                        <a href="{{ url_for('download_zentao_file',filename=record.name) }}" 
+                                           class="btn-action" 
+                                           title="下载禅道 CSV">
+                                            <span class="btn-icon">📊</span>
+                                            <span class="btn-text">禅道</span>
+                                        </a>
+                                        {% endif %}
+                                        {% if settings.ENABLE_TESTLINK %}
+                                        <a href="{{ url_for('download_testlink_file',filename=record.name) }}" 
+                                           class="btn-action" 
+                                           title="下载 TestLink XML">
+                                            <span class="btn-icon">📄</span>
+                                            <span class="btn-text">TestLink</span>
+                                        </a>
+                                        {% endif %}
+                                        <a href="{{ url_for('uploaded_file',filename=record.name) }}" 
+                                           class="btn-action" 
+                                           title="下载 XMind 原文件">
+                                            <span class="btn-icon">📥</span>
+                                            <span class="btn-text">XMind</span>
+                                        </a>
+                                    </div>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                    <div id="noResults" style="display: none; text-align: center; padding: 2rem; color: var(--text-muted);">
+                        😕 没有找到匹配的记录
+                    </div>
+                    <!-- Pagination Container -->
+                    <div id="recordsTableBody-pagination"></div>
+                </div>
+                {% endif %}
+                
+            </div>
+        </main>
+    </div>
+
+<script>
+    // Open guide modal
+    function openGuideModal() {
+        const modal = document.getElementById("guideModal");
+        modal.style.display = "flex";
+        setTimeout(() => modal.classList.add("show"), 10);
+        document.body.style.overflow = "hidden";
+    }
+
+    // Close guide modal
+    function closeGuideModal() {
+        const modal = document.getElementById("guideModal");
+        modal.classList.remove("show");
+        setTimeout(() => {
+            modal.style.display = "none";
+            document.body.style.overflow = "auto";
+        }, 300);
+    }
+
+    const fileInput = document.getElementById("file");
+    const fileLabel = document.getElementById("file-label");
+    const displayName = document.getElementById("file-display-name");
+    
+    if (fileInput) {
+        fileInput.addEventListener("change", function () {
+            if (this.files.length > 0) {
+                const fileName = this.files[0].name;
+                displayName.innerText = "已选择: " + fileName;
+                displayName.style.color = "var(--primary-color)";
+                
+                fileLabel.style.borderColor = "var(--primary-color)";
+                fileLabel.style.background = "#eff6ff";
+                fileLabel.querySelector(".upload-icon").innerText = "✅";
+            }
+        });
+    }
+
+    if (fileLabel) {
+        // Drag and drop functionality
+        fileLabel.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            fileLabel.style.borderColor = "var(--primary-color)";
+            fileLabel.style.background = "#eff6ff";
+            fileLabel.style.transform = "translateY(-4px)";
+            fileLabel.style.boxShadow = "0 10px 20px -5px rgba(59, 130, 246, 0.15)";
+        });
+
+        fileLabel.addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            if (!fileInput.files.length) {
+                fileLabel.style.borderColor = "#cbd5e1";
+                fileLabel.style.background = "#fafafa";
+                fileLabel.style.transform = "translateY(0)";
+                fileLabel.style.boxShadow = "none";
+            }
+        });
+
+        fileLabel.addEventListener('drop', (e) => {
+            e.preventDefault();
+            const files = e.dataTransfer.files;
+            
+            if (files.length > 0 && files[0].name.endsWith('.xmind')) {
+                fileInput.files = files;
+                // Manually trigger change event
+                const event = new Event('change');
+                fileInput.dispatchEvent(event);
+            } else {
+                showToast('请上传 .xmind 格式的文件', 'warning');
+                fileLabel.style.borderColor = "#cbd5e1";
+                fileLabel.style.background = "#fafafa";
+                fileLabel.style.transform = "translateY(0)";
+            }
+        });
+    }
+
+    function showToast(message, type = 'success') {
+        let container = document.getElementById('toast-container');
+        if (!container) {
+            container = document.createElement('div');
+            container.id = 'toast-container';
+            document.body.appendChild(container);
+        }
+        const toast = document.createElement('div');
+        toast.className = `toast toast-${type}`;
+        const icons = { success: '✅', error: '❌', warning: '⚠️' };
+        toast.innerHTML = `<span class="toast-icon">${icons[type]}</span><span class="toast-message">${message}</span>`;
+        container.appendChild(toast);
+        setTimeout(() => toast.classList.add('show'), 10);
+        setTimeout(() => {
+            toast.classList.remove('show');
+            setTimeout(() => toast.remove(), 300);
+        }, 3000);
+    }
+
+    // Close modal when pressing Escape key
+    document.addEventListener("keydown", function(event) {
+        if (event.key === "Escape") {
+            closeGuideModal();
+        }
+    });
+
+    // Initialize pagination after DOM loads
+    let recordsPagination = null;
+    document.addEventListener('DOMContentLoaded', function() {
+        const tbody = document.getElementById('recordsTableBody');
+        if (tbody && tbody.getElementsByTagName('tr').length > 0) {
+            recordsPagination = new Pagination({
+                tableId: 'recordsTableBody',
+                itemsPerPage: 20
+            });
+            // Store in global instances for onclick handlers
+            window.paginationInstances = window.paginationInstances || {};
+            window.paginationInstances['recordsTableBody'] = recordsPagination;
+        }
+    });
+
+    // Filter table function
+    function filterTable() {
+        const searchInput = document.getElementById("searchInput");
+        const projectFilter = document.getElementById("projectFilter");
+        const tbody = document.getElementById("recordsTableBody");
+        const noResults = document.getElementById("noResults");
+        
+        if (!tbody) return;
+        
+        const searchTerm = searchInput ? searchInput.value.toLowerCase() : '';
+        const projectTerm = projectFilter ? projectFilter.value : '';
+        
+        const rows = tbody.getElementsByTagName("tr");
+        let visibleCount = 0;
+        const visibleRows = [];
+        
+        for (let row of rows) {
+            const project = row.getAttribute("data-project") || '';
+            const filename = row.getAttribute("data-filename") || '';
+            
+            const matchesSearch = filename.toLowerCase().includes(searchTerm);
+            const matchesProject = !projectTerm || project === projectTerm;
+            
+            if (matchesSearch && matchesProject) {
+                row.style.display = "";
+                visibleCount++;
+                visibleRows.push(row);
+            } else {
+                row.style.display = "none";
+            }
+        }
+        
+        // Show/hide no results message
+        if (noResults) {
+            if (visibleCount === 0) {
+                tbody.parentElement.style.display = "none";
+                noResults.style.display = "block";
+            } else {
+                tbody.parentElement.style.display = "table";
+                noResults.style.display = "none";
+            }
+        }
+        
+        // Refresh pagination with filtered results
+        if (recordsPagination) {
+            recordsPagination.refresh(visibleRows);
+        }
+    }
+
+</script>
+
+</body>
+</html>

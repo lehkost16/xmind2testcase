@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>系统配置 | Xmind2TestCase</title>
+    <link rel="shortcut icon" href="{{ url_for('static',path='favicon.ico') }}" type="image/x-icon"/>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+    <link rel="stylesheet" type="text/css" media="all" href="{{ url_for('static',path='css/style.css') }}">
+    <style>
+        .config-section {
+            margin-bottom: 2.5rem;
+        }
+        .config-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+            gap: 2rem;
+        }
+        .config-card {
+            background: #ffffff;
+            border-radius: 12px;
+            padding: 1.5rem;
+            border: 1px solid #e2e8f0;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+            display: flex;
+            flex-direction: column;
+        }
+        .config-card h3 {
+            margin-top: 0;
+            font-size: 1.1rem;
+            color: #1e293b;
+            border-bottom: 2px solid #f1f5f9;
+            padding-bottom: 0.75rem;
+            margin-bottom: 1.25rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .config-hint {
+            font-size: 0.85rem;
+            color: #64748b;
+            margin-bottom: 1rem;
+            line-height: 1.5;
+        }
+        .switch-group {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.75rem 0;
+            border-bottom: 1px solid #f1f5f9;
+        }
+        .switch-group:last-child {
+            border-bottom: none;
+        }
+        .switch-label {
+            font-weight: 500;
+            color: #334155;
+        }
+        .btn-save-all {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            padding: 1rem 2.5rem;
+            font-size: 1.1rem;
+            border-radius: 50px;
+            box-shadow: 0 10px 25px -5px rgba(59, 130, 246, 0.5);
+            z-index: 100;
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="brand"><h1>X2T</h1></div>
+            <nav>
+                <a href="{{ url_for('index') }}" class="nav-item">
+                    <span class="icon">🏠</span> 首页仪表盘
+                </a>
+                <a href="{{ url_for('manage_projects') }}" class="nav-item">
+                    <span class="icon">📂</span> 项目管理
+                </a>
+                <a href="{{ url_for('manage_configs') }}" class="nav-item active">
+                    <span class="icon">⚙️</span> 系统配置
+                </a>
+            </nav>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <header class="top-bar">
+                <h2>系统全局配置</h2>
+            </header>
+
+            <form id="config-form" class="content-wrapper">
+                <div class="config-grid">
+                    <!-- Case Types -->
+                    <div class="config-card">
+                        <h3><span>🏷️</span> 用例类型管理</h3>
+                        <p class="config-hint">管理支持的用例类型。点击“添加”按钮加入新项，点击项旁的“&times;”删除。</p>
+                        <div class="tag-manager" id="case_types_manager">
+                            <div class="tag-container" id="case_types_tags"></div>
+                            <div class="tag-input-group">
+                                <input type="text" class="input-modern" placeholder="输入类型名称..." onkeydown="if(event.key==='Enter'){addTag('case_types');event.preventDefault();}">
+                                <button type="button" class="btn-primary" onclick="addTag('case_types')">添加</button>
+                            </div>
+                        </div>
+                        <input type="hidden" name="case_types" value="{{ configs.case_types }}">
+                    </div>
+
+                    <!-- Apply Phases -->
+                    <div class="config-card">
+                        <h3><span>📅</span> 应用阶段管理</h3>
+                        <p class="config-hint">管理测试流程中的对应阶段。</p>
+                        <div class="tag-manager" id="apply_phases_manager">
+                            <div class="tag-container" id="apply_phases_tags"></div>
+                            <div class="tag-input-group">
+                                <input type="text" class="input-modern" placeholder="输入阶段名称..." onkeydown="if(event.key==='Enter'){addTag('apply_phases');event.preventDefault();}">
+                                <button type="button" class="btn-primary" onclick="addTag('apply_phases')">添加</button>
+                            </div>
+                        </div>
+                        <input type="hidden" name="apply_phases" value="{{ configs.apply_phases }}">
+                    </div>
+
+                    <!-- Project List -->
+                    <div class="config-card">
+                        <h3><span>📁</span> 预设项目管理</h3>
+                        <p class="config-hint">在这里预设项目名称。添加后，系统会自动在“项目管理”及首页下拉框中生成该项目。</p>
+                        <div class="tag-manager" id="projects_manager">
+                            <div class="tag-container" id="projects_tags"></div>
+                            <div class="tag-input-group">
+                                <input type="text" class="input-modern" placeholder="输入项目名称..." onkeydown="if(event.key==='Enter'){addTag('projects');event.preventDefault();}">
+                                <button type="button" class="btn-primary" onclick="addTag('projects')">添加</button>
+                            </div>
+                        </div>
+                        <input type="hidden" name="projects" value="{{ configs.projects }}">
+                    </div>
+
+                    <!-- Switches -->
+                    <div class="config-card">
+                        <h3><span>🔌</span> 功能组件开关</h3>
+                        <p class="config-hint">控制全局导出功能的可用性。</p>
+                        
+                        <div class="switch-group">
+                            <span class="switch-label">开启禅道导出 (CSV)</span>
+                            <input type="checkbox" name="enable_zentao" value="1" {% if configs.enable_zentao == '1' %}checked{% endif %}>
+                        </div>
+                        
+                        <div class="switch-group">
+                            <span class="switch-label">开启 TestLink 导出 (XML)</span>
+                            <input type="checkbox" name="enable_testlink" value="1" {% if configs.enable_testlink == '1' %}checked{% endif %}>
+                        </div>
+                    </div>
+                </div>
+
+                <button type="button" onclick="saveConfigs()" class="btn-primary btn-save-all">
+                    💾 保存全局配置
+                </button>
+            </form>
+        </main>
+    </div>
+
+    <script>
+        // Tag management state
+        const configData = {
+            case_types: "{{ configs.case_types }}".split(',').filter(i => i.trim()),
+            apply_phases: "{{ configs.apply_phases }}".split(',').filter(i => i.trim()),
+            projects: "{{ configs.projects }}".split(',').filter(i => i.trim())
+        };
+
+        const protectedTags = [
+            '功能测试', '接口测试', '性能测试', '安全测试', '配置相关', '安装卸载', '单元测试', '其他',
+            '单元测试阶段', '功能测试阶段', '集成测试阶段', '系统测试阶段', '验收测试阶段', '冒烟测试阶段'
+        ];
+
+        function renderTags(name) {
+            const container = document.getElementById(`${name}_tags`);
+            container.innerHTML = '';
+            configData[name].forEach((tag, index) => {
+                const isProtected = protectedTags.includes(tag.trim());
+                const badge = document.createElement('div');
+                badge.className = 'tag-badge';
+                if (isProtected) {
+                    badge.style.background = '#f1f5f9';
+                    badge.style.borderColor = '#e2e8f0';
+                    badge.title = '系统内置项，不可删除';
+                }
+                badge.innerHTML = `
+                    <span>${tag}</span>
+                    ${isProtected ? '' : `<span class="remove-tag" onclick="removeTag('${name}', ${index})">&times;</span>`}
+                `;
+                container.appendChild(badge);
+            });
+            // Update hidden input
+            document.querySelector(`input[name="${name}"]`).value = configData[name].join(',');
+        }
+
+        function addTag(name) {
+            const input = document.querySelector(`#${name}_manager input`);
+            const rawVal = input.value.trim();
+            if (!rawVal) return;
+
+            // 支持逗号分隔批量添加
+            const items = rawVal.split(/[,，]/).map(i => i.trim()).filter(i => i);
+            let hasDuplicate = false;
+
+            items.forEach(val => {
+                // 不分大小写的去重校验
+                const isDup = configData[name].some(existing => existing.toLowerCase() === val.toLowerCase());
+                if (!isDup) {
+                    configData[name].push(val);
+                } else {
+                    hasDuplicate = true;
+                }
+            });
+
+            if (hasDuplicate) {
+                showToast('部分或全部项已存在，已自动过滤重复内容', 'warning');
+            }
+
+            renderTags(name);
+            input.value = '';
+            input.focus();
+        }
+
+
+
+        function removeTag(name, index) {
+            const tagValue = configData[name][index];
+            
+            // 保护内置项
+            if (protectedTags.includes(tagValue)) {
+                showToast(`“${tagValue}” 是系统内置项，不支持删除`, 'warning');
+                return;
+            }
+
+            // 项目删除二次确认（针对可能存在数据的项目）
+            if (name === 'projects') {
+                if (!confirm(`确定要在配置列表中移除项目 “${tagValue}” 吗？\n如果该项目下存在测试记录，保存配置时将会报错拦截。`)) {
+                    return;
+                }
+            }
+
+            configData[name].splice(index, 1);
+            renderTags(name);
+        }
+
+        // Initialize
+        ['case_types', 'apply_phases', 'projects'].forEach(renderTags);
+
+        function showToast(message, type = 'success') {
+            let container = document.getElementById('toast-container');
+            if (!container) {
+                container = document.createElement('div');
+                container.id = 'toast-container';
+                document.body.appendChild(container);
+            }
+            
+            const toast = document.createElement('div');
+            toast.className = `toast toast-${type} show`;
+            const icons = { success: '✅', error: '❌', warning: '⚠️' };
+            toast.innerHTML = `<span class="toast-icon">${icons[type]}</span><span class="toast-message">${message}</span>`;
+            
+            container.appendChild(toast);
+            
+            setTimeout(() => {
+                toast.classList.remove('show');
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        function saveConfigs() {
+            const form = document.getElementById('config-form');
+            const formData = new FormData(form);
+            const data = {};
+            
+            formData.forEach((value, key) => {
+                data[key] = value;
+            });
+            
+            data['enable_zentao'] = form.querySelector('[name="enable_zentao"]').checked ? '1' : '0';
+            data['enable_testlink'] = form.querySelector('[name="enable_testlink"]').checked ? '1' : '0';
+
+            fetch('/api/configs', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(data)
+            })
+            .then(async res => {
+                const result = await res.json();
+                if (!res.ok) {
+                    throw new Error(result.detail || result.message || '保存失败');
+                }
+                return result;
+            })
+            .then(res => {
+                showToast('配置保存成功！');
+                setTimeout(() => location.reload(), 1000);
+            })
+            .catch(err => {
+                console.error(err);
+                showToast(err.message, 'error');
+            });
+        }
+    </script>
+</body>
+</html>

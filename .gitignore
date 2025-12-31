@@ -1,17 +1,63 @@
-.DS_Store
-.idea
-.vscode
-
-# build
-*.egg
-*.egg-info
-dist
-build
-__pycache__
-.pypirc
+# Python
+__pycache__/
 *.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
 
-# web
-*data.db3
-*running.log
-*uploads
+# Virtual Environment
+.venv/
+venv/
+ENV/
+env/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Project Specific
+uploads/*.xmind
+uploads/*.xml
+uploads/*.csv
+!uploads/.gitkeep
+logs/*.log
+!logs/.gitkeep
+backups/*.db3
+!backups/.gitkeep
+*.db3
+*.db
+running.log
+
+# Temporary files
+*.tmp
+*.bak
+*.cache
+.pytest_cache/
+.coverage
+htmlcov/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Un-used files
+un_used/
