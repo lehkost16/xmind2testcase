@@ -128,7 +128,7 @@ def create_xmind_template(output_path):
         xmind.writestr('manifest.json', json.dumps(manifest, ensure_ascii=False))
 
 if __name__ == "__main__":
-    target = "/home/nana/PyProjects/xmind2testcase/app/static/guide/XMind测试用例模板.xmind"
+    target = "app/static/guide/XMind测试用例模板.xmind"
     # Backup old one
     if os.path.exists(target):
         os.rename(target, target + ".bak")
