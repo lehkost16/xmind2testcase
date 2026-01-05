@@ -986,3 +986,82 @@ input[type="submit"]:hover {
 }
 
 .long-name-info { color: #f59e0b; font-size: 0.8em; }
+
+/* Step Status Indicators */
+.step-item {
+    display: block; /* Changed from flex to block to allow container stacking */
+    margin-bottom: 0.75rem;
+}
+
+.step-content {
+    /* No longer a flex child in the same way */
+}
+
+.step-status-container {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 4px;
+}
+
+
+.step-status-btn {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    border: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 12px;
+    transition: all 0.2s;
+    flex-shrink: 0;
+    margin-top: 2px;
+    background: #f1f5f9;
+    color: #94a3b8;
+    border: 1px solid #cbd5e1;
+    line-height: 1;
+    font-weight: bold;
+}
+
+.step-status-btn:hover {
+    transform: scale(1.1);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.step-status-btn:focus {
+    outline: none;
+}
+
+.step-status-btn.status-not_run {
+    background: #f1f5f9;
+    color: #94a3b8;
+    border-color: #cbd5e1;
+}
+
+.step-status-btn.status-not_run:hover {
+    border-color: #64748b;
+    color: #64748b;
+}
+
+.step-status-btn.status-pass {
+    background: #dcfce7;
+    color: #16a34a;
+    border-color: #86efac;
+}
+
+.step-status-btn.status-pass:hover {
+    background: #bbf7d0;
+    border-color: #4ade80;
+}
+
+.step-status-btn.status-fail {
+    background: #fee2e2;
+    color: #ef4444;
+    border-color: #fca5a5;
+}
+
+.step-status-btn.status-fail:hover {
+    background: #fecaca;
+    border-color: #f87171;
+}

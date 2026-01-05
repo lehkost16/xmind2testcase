@@ -26,7 +26,7 @@
                         <button onclick="toggleEditName()" class="btn-icon" title="重命名">✏️</button>
                     </h1>
                     <h2 style="font-size: 1rem; color: var(--text-muted); font-weight: normal; margin-top: 0.5rem;">
-                        测试套件: <strong>{{ suite_count }}</strong> &middot; 测试用例: <strong>{{ suite | length }}</strong>
+                        测试套件: <strong>{{ suite_count }}</strong> &middot; 功能模块: <strong>{{ suite | length }}</strong>
                     </h2>
                 </div>
                 <div style="display: flex; gap: 0.75rem;">
@@ -65,9 +65,9 @@
         <thead>
         <tr>
             <th width="40px" class="text-center">#</th>
-            <th width="12%">模块/套件</th>
+            <th width="10%">模块/套件</th>
             <th>用例标题</th>
-            <th width="100px">属性</th>
+            <th width="120px">属性</th>
             <th width="25%">步骤 & 预期</th>
             <th width="15%">备注</th>
             <th width="10%">执行结果</th>
@@ -110,14 +110,33 @@
                     {% if test.steps %}
                         <ol style="padding-left: 1.2rem; margin: 0;">
                             {% for step in test.steps %}
-                                <li style="margin-bottom: 0.75rem;">
-                                    <div contenteditable="true" class="editable-step" data-index="{{ case_index }}" data-step-index="{{ loop.index0 }}" data-type="action" data-placeholder="请输入测试步骤...">{{ step.actions }}</div>
-                                    {% if step.expectedresults %}
+                                <li class="step-item">
+                                    <div class="step-content">
+                                        <div style="display: flex; gap: 8px; align-items: flex-start; justify-content: space-between;">
+                                            <span class="step-number">{{ loop.index }}.</span>
+                                            <div contenteditable="true" class="editable-step" data-index="{{ case_index }}" data-step-index="{{ loop.index0 }}" data-type="action" data-placeholder="请输入测试步骤..." style="flex: 1;">{{ step.actions }}</div>
+                                            <div style="display: flex; gap: 4px; align-items: center; margin-top: 4px;">
+                                                <button class="step-status-btn status-{{ step.status | default('not_run') }}" 
+                                                        onclick="cycleStepStatus(this, {{ case_index }}, {{ loop.index0 }})"
+                                                        title="点击切换状态: 未执行 -> 通过 -> 失败">
+                                                    {% if step.status == 'pass' %}
+                                                        ✓
+                                                    {% elif step.status == 'fail' %}
+                                                        ✕
+                                                    {% else %}
+                                                        -
+                                                    {% endif %}
+                                                </button>
+                                                <button class="btn-icon delete-step-btn" onclick="deleteStep({{ case_index }}, {{ loop.index0 }})" title="删除步骤">
+                                                    🗑️
+                                                </button>
+                                            </div>
+                                        </div>
                                         <div style="font-style: italic; color: #6b7280; margin-top: 4px; display: flex; align-items: flex-start;">
                                             <span style="margin-right: 8px; color: #94a3b8; font-weight: bold; margin-top: 6px;">&rdsh;</span>
                                             <div contenteditable="true" class="editable-step" data-index="{{ case_index }}" data-step-index="{{ loop.index0 }}" data-type="expected" style="flex: 1;" data-placeholder="请输入预期结果...">{{ step.expectedresults }}</div>
                                         </div>
-                                    {% endif %}
+                                    </div>
                                 </li>
                             {% endfor %}
                         </ol>
@@ -144,6 +163,12 @@
         {% endfor %}
         </tbody>
     </table>
+    </div>
+    <input type="hidden" id="_initial_load_marker">
+    <script>
+        // Ensure DOM is fully loaded before checking/migrating data
+        // This is a small helper to handle legacy data if needed
+    </script>
     </div>
 
 </div>
@@ -222,18 +247,73 @@
         border-style: solid;
         border-color: var(--primary-color);
     }
+
+    .step-number {
+        color: #374151; /* Darker grey for better visibility */
+        font-weight: 600;
+        min-width: 1.2em;
+        padding-top: 2px;
+        flex-shrink: 0;
+    }
+
+    .delete-step-btn {
+        font-size: 0.9rem;
+        padding: 2px 6px;
+        opacity: 0.6;
+        transition: opacity 0.2s;
+    }
+
+    .delete-step-btn:hover {
+        opacity: 1;
+        background-color: #fee2e2;
+        color: #ef4444;
+    }
 </style>
 
 <script>
     const recordId = document.getElementById('record-id').value;
     const testCases = {{ suite | tojson | safe }};
     
-    // Ensure all test cases have a comment field
+    // Ensure all test cases have a comment field and steps have status
     testCases.forEach(tc => {
         if (!tc.hasOwnProperty('comment')) {
             tc.comment = '';
         }
+        if (tc.steps) {
+            tc.steps.forEach(step => {
+                if (!step.status) step.status = 'not_run';
+            });
+        }
     });
+
+    // Step Status Logic
+    const STEP_STATUS_MAP = {
+        'not_run': { next: 'pass', icon: '-', class: 'status-not_run', title: '未执行' },
+        'pass':    { next: 'fail', icon: '✓', class: 'status-pass',    title: '通过' },
+        'fail':    { next: 'not_run', icon: '✕', class: 'status-fail', title: '失败' }
+    };
+
+    function cycleStepStatus(btn, caseIndex, stepIndex) {
+        // Find current status
+        let currentStatus = 'not_run';
+        if (btn.classList.contains('status-pass')) currentStatus = 'pass';
+        else if (btn.classList.contains('status-fail')) currentStatus = 'fail';
+        
+        const nextStatusKey = STEP_STATUS_MAP[currentStatus].next;
+        const nextStatus = STEP_STATUS_MAP[nextStatusKey];
+
+        // Update UI
+        btn.className = `step-status-btn ${nextStatus.class}`;
+        btn.innerText = nextStatus.icon;
+        
+        // Update Data
+        if (testCases[caseIndex] && testCases[caseIndex].steps && testCases[caseIndex].steps[stepIndex]) {
+            testCases[caseIndex].steps[stepIndex].status = nextStatusKey;
+        }
+
+        // Trigger Auto Save
+        performAutoSave();
+    }
 
     function toggleEditName() {
         const display = document.getElementById('record-name-display');
@@ -491,7 +571,8 @@
             step_number: stepIndex + 1,
             actions: "",
             expectedresults: "",
-            execution_type: 1
+            execution_type: 1,
+            status: "not_run"
         };
         testCases[caseIndex].steps.push(newStep);
 
@@ -503,17 +584,93 @@
         }
 
         const li = document.createElement('li');
-        li.style.marginBottom = "0.5rem";
+        li.className = "step-item";
         
         li.innerHTML = `
-            <div contenteditable="true" class="editable-step" data-index="${caseIndex}" data-step-index="${stepIndex}" data-type="action" data-placeholder="请输入测试步骤..."></div>
-            <div style="font-style: italic; color: #6b7280; margin-top: 4px; display: flex; align-items: flex-start;">
-                <span style="margin-right: 8px; color: #94a3b8; font-weight: bold; margin-top: 6px;">&rdsh;</span>
-                <div contenteditable="true" class="editable-step" data-index="${caseIndex}" data-step-index="${stepIndex}" data-type="expected" style="flex: 1;" data-placeholder="请输入预期结果..."></div>
+            <div class="step-content">
+                <div style="display: flex; gap: 8px; align-items: flex-start; justify-content: space-between;">
+                    <span class="step-number">${stepIndex + 1}.</span>
+                    <div contenteditable="true" class="editable-step" data-index="${caseIndex}" data-step-index="${stepIndex}" data-type="action" data-placeholder="请输入测试步骤..." style="flex: 1;"></div>
+                    <div style="display: flex; gap: 4px; align-items: center; margin-top: 4px;">
+                        <button class="step-status-btn status-not_run" 
+                                onclick="cycleStepStatus(this, ${caseIndex}, ${stepIndex})"
+                                title="点击切换状态: 未执行 -> 通过 -> 失败">
+                            -
+                        </button>
+                        <button class="btn-icon delete-step-btn" onclick="deleteStep(${caseIndex}, ${stepIndex})" title="删除步骤">
+                            🗑️
+                        </button>
+                    </div>
+                </div>
+                <div style="font-style: italic; color: #6b7280; margin-top: 4px; display: flex; align-items: flex-start;">
+                    <span style="margin-right: 8px; color: #94a3b8; font-weight: bold; margin-top: 6px;">&rdsh;</span>
+                    <div contenteditable="true" class="editable-step" data-index="${caseIndex}" data-step-index="${stepIndex}" data-type="expected" style="flex: 1;" data-placeholder="请输入预期结果..."></div>
+                </div>
             </div>
         `;
-        
         if (ol) ol.appendChild(li);
+    }
+
+    function deleteStep(caseIndex, stepIndex) {
+        if (!confirm('确定要删除此步骤吗？')) return;
+
+        // Remove from data source
+        if (testCases[caseIndex] && testCases[caseIndex].steps) {
+            testCases[caseIndex].steps.splice(stepIndex, 1);
+        }
+
+        // Re-render the steps list for this test case
+        const tableRow = document.querySelectorAll('tbody tr')[caseIndex]; 
+        // Note: Using loop index for tableRow might be fragile if sorted/filtered, 
+        // but currently preview.html renders sequentially. 
+        // A safer way is to find the OL with a specific ID or relative traverse.
+        
+        // Actually, easiest way is to reload page or just update DOM carefully.
+        // Let's force a reload for now? No, bad UX.
+        // Let's rebuild the OL content.
+        
+        const ol = tableRow.querySelector('ol');
+        ol.innerHTML = '';
+        
+        // Re-populate steps
+        if (testCases[caseIndex].steps) {
+            testCases[caseIndex].steps.forEach((step, idx) => {
+                const li = document.createElement('li');
+                li.className = "step-item";
+                
+                // Determine Status Icon/Class
+                let statusClass = 'status-not_run';
+                let statusIcon = '-';
+                if (step.status === 'pass') { statusClass = 'status-pass'; statusIcon = '✓'; }
+                else if (step.status === 'fail') { statusClass = 'status-fail'; statusIcon = '✕'; }
+
+                li.innerHTML = `
+                    <div class="step-content">
+                        <div style="display: flex; gap: 8px; align-items: flex-start; justify-content: space-between;">
+                            <span class="step-number">${idx + 1}.</span>
+                            <div contenteditable="true" class="editable-step" data-index="${caseIndex}" data-step-index="${idx}" data-type="action" data-placeholder="请输入测试步骤..." style="flex: 1;">${step.actions || ''}</div>
+                            <div style="display: flex; gap: 4px; align-items: center; margin-top: 4px;">
+                                <button class="step-status-btn ${statusClass}" 
+                                        onclick="cycleStepStatus(this, ${caseIndex}, ${idx})"
+                                        title="点击切换状态: 未执行 -> 通过 -> 失败">
+                                    ${statusIcon}
+                                </button>
+                                <button class="btn-icon delete-step-btn" onclick="deleteStep(${caseIndex}, ${idx})" title="删除步骤">
+                                    🗑️
+                                </button>
+                            </div>
+                        </div>
+                        <div style="font-style: italic; color: #6b7280; margin-top: 4px; display: flex; align-items: flex-start;">
+                            <span style="margin-right: 8px; color: #94a3b8; font-weight: bold; margin-top: 6px;">&rdsh;</span>
+                            <div contenteditable="true" class="editable-step" data-index="${caseIndex}" data-step-index="${idx}" data-type="expected" style="flex: 1;" data-placeholder="请输入预期结果...">${step.expectedresults || ''}</div>
+                        </div>
+                    </div>
+                `;
+                ol.appendChild(li);
+            });
+        }
+        
+        performAutoSave();
     }
 
     function copyExecutionResults() {

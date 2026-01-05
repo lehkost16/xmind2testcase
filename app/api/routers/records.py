@@ -1,5 +1,6 @@
 import sqlite3
 import json
+from urllib.parse import quote
 from fastapi import APIRouter, Depends, HTTPException, Body
 from pydantic import BaseModel
 from typing import Any, Dict, List
@@ -95,28 +96,75 @@ def export_record(record_id: int, db: sqlite3.Connection = Depends(get_db)):
     except:
         pass
         
-    # Stats
-    total = len(testcases)
-    passed = sum(1 for t in testcases if str(t.get('result', '')).lower() == 'pass')
-    failed = sum(1 for t in testcases if str(t.get('result', '')).lower() == 'fail')
-    blocked = sum(1 for t in testcases if str(t.get('result', '')).lower() == 'block')
-    skipped = sum(1 for t in testcases if str(t.get('result', '')).lower() == 'skip')
-    executed = passed + failed + blocked
+    # --- Statistics Calculation ---
     
-    # Generate MD Report
-    report = f"""# {name} 执行结果
+    # 1. Case Stats
+    total_cases = len(testcases)
+    case_stats = {'Pass': 0, 'Fail': 0, 'Block': 0, 'Skip': 0, 'Not Run': 0}
     
-## 总结
-- **总用例数**: {total}
-- **执行数**: {executed}
-- **通过数**: {passed}
-- **失败数**: {failed}
-- **阻塞数**: {blocked}
-- **跳过数**: {skipped}
+    # 2. Step Stats
+    step_stats = {'Total': 0, 'pass': 0, 'fail': 0, 'not_run': 0}
+    
+    # 3. Suite Stats
+    suite_stats = {} # {suite_name: {total, pass, fail, block, skip, not_run}}
 
-## 详情
+    for test in testcases:
+        # Case Stat
+        res = test.get('result', 'Not Run')
+        # Normalize result key to match our map if needed, but usually it's exact
+        if res not in case_stats:
+            case_stats['Not Run'] += 1
+        else:
+            case_stats[res] += 1
+            
+        # Step Stat
+        steps = test.get('steps', [])
+        for step in steps:
+            step_stats['Total'] += 1
+            s_status = step.get('status', 'not_run')
+            step_stats[s_status] = step_stats.get(s_status, 0) + 1
+            
+        # Suite Stat
+        suite = test.get('suite', 'Root')
+        if suite not in suite_stats:
+            suite_stats[suite] = {'Total': 0, 'Pass': 0, 'Fail': 0, 'Block': 0, 'Skip': 0, 'Not Run': 0}
+        
+        suite_stats[suite]['Total'] += 1
+        suite_stats[suite][res] = suite_stats[suite].get(res, 0) + 1
+
+    executed_cases = case_stats['Pass'] + case_stats['Fail'] + case_stats['Block']
+    
+    # --- Generate Report ---
+    report = f"""# {name.split('.')[0]}执行结果
+
+## 1. 模块/套件执行概况
+- **总模块数**: {total_cases}
+- **已执行**: {executed_cases}
+- **通过**: {case_stats['Pass']}
+- **失败**: {case_stats['Fail']}
+- **阻塞**: {case_stats['Block']}
+- **跳过**: {case_stats['Skip']}
+
+## 2. 用例执行概况
+- **总用例数**: {step_stats['Total']}
+- **通过**: {step_stats['pass']}
+- **失败**: {step_stats['fail']}
+- **未执行**: {step_stats['not_run']}
+
+## 3. 模块/套件执行详情
+
+| 模块/套件 | 功能模块 | 通过 | 失败 | 阻塞 | 跳过 | 未执行 |
+|---|---|---|---|---|---|---|
+"""
+    
+    for suite, stats in suite_stats.items():
+        report += f"| {suite} | {stats['Total']} | {stats['Pass']} | {stats['Fail']} | {stats['Block']} | {stats['Skip']} | {stats['Not Run']} |\n"
+
+    report += """
+## 4. 详细记录
+
 | Case ID | Suite | 名称 | 结果 | 备注 |  
-|---------|-------|-------|--------|---------|
+|---|---|---|---|---|
 """
     result_mapping = {
         'Pass': '通过',
@@ -130,18 +178,20 @@ def export_record(record_id: int, db: sqlite3.Connection = Depends(get_db)):
         raw_result = test.get('result', 'Not Run')
         result = result_mapping.get(raw_result, raw_result)
         
-        comment = test.get('comment', '')
-        suite = test.get('suite', 'Root')
-        title = test.get('name', '')
+        # Ensure values are strings to prevent crashes on None
+        comment = str(test.get('comment') or '')
+        suite = str(test.get('suite') or 'Root')
+        title = str(test.get('name') or '')
         
-        # Simple cleanup for table format
-        title = title.replace('|', '-').replace('\\n', ' ')
-        comment = comment.replace('|', '-').replace('\\n', ' ')
+        # Simple cleanup
+        title = title.replace('|', '-').replace('\n', ' ')
+        comment = comment.replace('|', '-').replace('\n', ' ')
         
         report += f"| {idx} | {suite} | {title} | {result} | {comment} |\n"
         
+    encoded_filename = quote(f"{name}_report.md")
     return Response(
         content=report, 
         media_type="text/markdown", 
-        headers={"Content-Disposition": f"attachment; filename={name}_report.md"}
+        headers={"Content-Disposition": f"attachment; filename*=utf-8''{encoded_filename}"}
     )
