@@ -95,6 +95,96 @@ manage_db() {
     uv run python manage_db.py
 }
 
+# PID 文件路径
+PID_FILE="running.pid"
+LOG_FILE="running.log"
+
+# 后台启动
+start_background() {
+    if [ -f "$PID_FILE" ]; then
+        if ps -p $(cat "$PID_FILE") > /dev/null; then
+            print_error "服务已在运行中 (PID: $(cat $PID_FILE))"
+            exit 1
+        else
+            rm "$PID_FILE"
+        fi
+    fi
+    
+    print_info "正在后台启动服务 (Production Mode)..."
+    nohup uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 4 > "$LOG_FILE" 2>&1 &
+    echo $! > "$PID_FILE"
+    
+    # Wait a moment to check if it crashed immediately
+    sleep 2
+    if ps -p $(cat "$PID_FILE") > /dev/null; then
+        print_success "服务启动成功! (PID: $(cat $PID_FILE))"
+        print_info "日志文件: $LOG_FILE"
+    else
+        print_error "服务启动失败，请查看日志: $LOG_FILE"
+        cat "$LOG_FILE"
+        rm "$PID_FILE"
+        exit 1
+    fi
+}
+
+# 停止服务
+stop_server() {
+    if [ ! -f "$PID_FILE" ]; then
+        print_warning "未找到运行中的服务 (PID文件不存在)"
+        return
+    fi
+    
+    PID=$(cat "$PID_FILE")
+    if ps -p "$PID" > /dev/null; then
+        print_info "正在停止服务 (PID: $PID)..."
+        kill "$PID"
+        
+        # Wait for process to exit
+        for i in {1..10}; do
+            if ! ps -p "$PID" > /dev/null; then
+                break
+            fi
+            sleep 0.5
+        done
+        
+        if ps -p "$PID" > /dev/null; then
+            print_warning "服务未响应，强制关闭..."
+            kill -9 "$PID"
+        fi
+        
+        rm "$PID_FILE"
+        print_success "服务已停止"
+    else
+        print_warning "PID文件存在但进程未运行，清理PID文件"
+        rm "$PID_FILE"
+    fi
+}
+
+# 重启服务
+restart_server() {
+    stop_server
+    sleep 1
+    start_background
+}
+
+# 查看状态
+check_status() {
+    if [ -f "$PID_FILE" ]; then
+        PID=$(cat "$PID_FILE")
+        if ps -p "$PID" > /dev/null; then
+            print_success "服务正在运行 (PID: $PID)"
+            print_info "监听端口: 8000"
+            return
+        else
+            print_error "服务未运行 (PID文件存在但进程丢失)"
+            exit 1
+        fi
+    else
+        print_warning "服务未运行"
+        exit 0
+    fi
+}
+
 # 清理项目
 clean_project() {
     print_warning "清理项目缓存和临时文件..."
@@ -115,7 +205,11 @@ show_help() {
     echo "命令:"
     echo "  init      - 初始化项目（首次运行）"
     echo "  dev       - 启动开发服务器（默认）"
-    echo "  prod      - 启动生产服务器"
+    echo "  prod      - 启动生产服务器（前台）"
+    echo "  start     - 后台启动服务"
+    echo "  stop      - 停止后台服务"
+    echo "  restart   - 重启后台服务"
+    echo "  status    - 查看服务状态"
     echo "  test      - 运行测试"
     echo "  db        - 数据库管理工具"
     echo "  clean     - 清理缓存文件"
@@ -136,6 +230,18 @@ main() {
             ;;
         prod)
             start_prod
+            ;;
+        start)
+            start_background
+            ;;
+        stop)
+            stop_server
+            ;;
+        restart)
+            restart_server
+            ;;
+        status)
+            check_status
             ;;
         test)
             run_tests

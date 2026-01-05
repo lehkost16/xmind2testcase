@@ -60,4 +60,5 @@ htmlcov/
 Thumbs.db
 
 # Un-used files
-un_used/
+un_used/running.pid
+running.log
