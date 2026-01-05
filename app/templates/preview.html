@@ -530,15 +530,46 @@
             })
             .then(res => res.text())
             .then(text => {
-                // Copy to clipboard
-                navigator.clipboard.writeText(text).then(() => {
+                // Copy to clipboard with fallback
+                const copyToClipboard = (str) => {
+                    // Try modern API first (if available and secure context)
+                    if (navigator.clipboard && navigator.clipboard.writeText) {
+                        return navigator.clipboard.writeText(str);
+                    }
+                    // Fallback for non-secure contexts or older browsers
+                    return new Promise((resolve, reject) => {
+                        try {
+                            const textArea = document.createElement("textarea");
+                            textArea.value = str;
+                            
+                            // Ensure it's not visible but part of the DOM
+                            textArea.style.position = "fixed";
+                            textArea.style.left = "-9999px";
+                            textArea.style.top = "0";
+                            document.body.appendChild(textArea);
+                            
+                            textArea.focus();
+                            textArea.select();
+                            
+                            const successful = document.execCommand('copy');
+                            document.body.removeChild(textArea);
+                            
+                            if (successful) resolve();
+                            else reject(new Error("Browser does not support copy"));
+                        } catch (err) {
+                            reject(err);
+                        }
+                    });
+                };
+
+                copyToClipboard(text).then(() => {
                     btn.innerHTML = "✅ 已复制";
                     setTimeout(() => {
                         btn.innerHTML = originalText;
                     }, 2000);
-                }, (err) => {
+                }).catch((err) => {
                     console.error('Could not copy text: ', err);
-                    alert("复制失败，请手动下载");
+                    alert("复制失败，您的浏览器暂不支持自动复制，请尝试手动下载文件。");
                     btn.innerHTML = originalText;
                 });
             })
