@@ -5,6 +5,7 @@ from pydantic import BaseModel
 from typing import Any, Dict, List
 from app.api.deps import get_db
 from app.services import file_service
+from fastapi.responses import Response
 
 router = APIRouter()
 
@@ -89,7 +90,6 @@ def export_record(record_id: int, db: sqlite3.Connection = Depends(get_db)):
     
     name, content = row
     testcases = []
-    import json
     try:
         testcases = json.loads(content) if content else []
     except:
@@ -97,29 +97,39 @@ def export_record(record_id: int, db: sqlite3.Connection = Depends(get_db)):
         
     # Stats
     total = len(testcases)
-    passed = sum(1 for t in testcases if t.get('result') == 'Pass')
-    failed = sum(1 for t in testcases if t.get('result') == 'Fail')
-    blocked = sum(1 for t in testcases if t.get('result') == 'Block')
-    skipped = sum(1 for t in testcases if t.get('result') == 'Skip')
+    passed = sum(1 for t in testcases if str(t.get('result', '')).lower() == 'pass')
+    failed = sum(1 for t in testcases if str(t.get('result', '')).lower() == 'fail')
+    blocked = sum(1 for t in testcases if str(t.get('result', '')).lower() == 'block')
+    skipped = sum(1 for t in testcases if str(t.get('result', '')).lower() == 'skip')
     executed = passed + failed + blocked
     
     # Generate MD Report
-    report = f"""# Test Execution Report: {name}
+    report = f"""# {name} 执行结果
     
-## Summary
-- **Total Test Cases**: {total}
-- **Executed**: {executed}
-- **Pass**: {passed}
-- **Fail**: {failed}
-- **Block**: {blocked}
-- **Skip**: {skipped}
+## 总结
+- **总用例数**: {total}
+- **执行数**: {executed}
+- **通过数**: {passed}
+- **失败数**: {failed}
+- **阻塞数**: {blocked}
+- **跳过数**: {skipped}
 
-## Details
-| Case ID | Suite | Title | Result | Comment |
+## 详情
+| Case ID | Suite | 名称 | 结果 | 备注 |  
 |---------|-------|-------|--------|---------|
 """
+    result_mapping = {
+        'Pass': '通过',
+        'Fail': '失败',
+        'Block': '阻塞',
+        'Skip': '跳过',
+        'Not Run': '未执行'
+    }
+
     for idx, test in enumerate(testcases, 1):
-        result = test.get('result', 'Not Run')
+        raw_result = test.get('result', 'Not Run')
+        result = result_mapping.get(raw_result, raw_result)
+        
         comment = test.get('comment', '')
         suite = test.get('suite', 'Root')
         title = test.get('name', '')
@@ -130,7 +140,6 @@ def export_record(record_id: int, db: sqlite3.Connection = Depends(get_db)):
         
         report += f"| {idx} | {suite} | {title} | {result} | {comment} |\n"
         
-    from fastapi.responses import Response
     return Response(
         content=report, 
         media_type="text/markdown", 

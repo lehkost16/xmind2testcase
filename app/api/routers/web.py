@@ -1,5 +1,6 @@
 import sqlite3
 import os
+import json
 from fastapi import APIRouter, Request, UploadFile, File, Depends, HTTPException, status, Form, Body
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
@@ -252,30 +253,40 @@ def preview_record(request: Request, record_id: int, db: sqlite3.Connection = De
         raise HTTPException(status_code=404, detail="Record not found")
 
     testcases = []
-    if record["content"]:
+    # record is likely sqlite3.Row, but index access is safer if dict access is suspect
+    db_content = record[2] 
+    record_name = record[1]
+    
+    if db_content:
         try:
-            testcases = json.loads(record["content"])
-        except:
+            testcases = json.loads(db_content)
+        except Exception as e:
             # Fallback to file parsing if DB content is corrupt
-            testcases = xmind_service.get_testcases(record["name"])
+            print(f"Error loading JSON for record {record_id}. Type: {type(db_content)}, Error: {e}")
+            testcases = xmind_service.get_testcases(record_name)
     else:
-        testcases = xmind_service.get_testcases(record["name"])
+        testcases = xmind_service.get_testcases(record_name)
 
     # suite_count 统计
-    testsuites = xmind_service.get_testsuites(record["name"])
+    testsuites = xmind_service.get_testsuites(record_name)
     suite_count = sum(len(suite.sub_suites) for suite in testsuites) if testsuites else 0
     
     _, dyn_settings = fetch_configs(db)
 
-    return templates.TemplateResponse('preview.html', {
+    response = templates.TemplateResponse('preview.html', {
         "request": request, 
-        "name": record["name"], 
+        "name": record_name, 
         "suite": testcases, 
         "suite_count": suite_count,
-        "record_id": record["id"],
-        "project_id": record["project_id"],
+        "record_id": record[0],
+        "project_id": record[3],
         "settings": dyn_settings
     })
+    # Disable caching to ensure fresh data on reload
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+    return response
 
 @router.get("/preview/{filename}", response_class=HTMLResponse, name="preview_file")
 def preview_file(request: Request, filename: str, db: sqlite3.Connection = Depends(get_db)):

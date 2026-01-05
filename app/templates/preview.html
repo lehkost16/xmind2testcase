@@ -64,12 +64,13 @@
     <table class="pure-table tests-table" style="width: 100%; border: none; margin: 0;">
         <thead>
         <tr>
-            <th width="60px" class="text-center">#</th>
-            <th width="15%">模块/套件</th>
+            <th width="40px" class="text-center">#</th>
+            <th width="12%">模块/套件</th>
             <th>用例标题</th>
-            <th width="150px">属性</th>
+            <th width="100px">属性</th>
             <th width="25%">步骤 & 预期</th>
-            <th width="12%">执行结果</th>
+            <th width="15%">备注</th>
+            <th width="10%">执行结果</th>
         </tr>
         </thead>
         <tbody>
@@ -126,6 +127,9 @@
                     <button class="btn-add-step" onclick="addStep({{ case_index }}, this)">
                         <span>➕</span> 增加步骤
                     </button>
+                </td>
+                <td>
+                     <div contenteditable="true" class="editable-cell" data-index="{{ case_index }}" data-field="comment" data-placeholder="备注..." style="min-height: 2rem; color: #6b7280; font-size: 0.9rem;">{{ test.comment or '' }}</div>
                 </td>
                 <td>
                     <select class="result-select input-modern" data-index="{{ loop.index0 }}" style="padding: 0.25rem 0.5rem; font-size: 0.85rem; margin-bottom: 0.25rem;">
@@ -223,6 +227,13 @@
 <script>
     const recordId = document.getElementById('record-id').value;
     const testCases = {{ suite | tojson | safe }};
+    
+    // Ensure all test cases have a comment field
+    testCases.forEach(tc => {
+        if (!tc.hasOwnProperty('comment')) {
+            tc.comment = '';
+        }
+    });
 
     function toggleEditName() {
         const display = document.getElementById('record-name-display');
@@ -286,8 +297,50 @@
         });
     }
 
-    // Add event listeners after DOM loads
+    function debounce(func, wait) {
+        let timeout;
+        return function(...args) {
+            const context = this;
+            clearTimeout(timeout);
+            timeout = setTimeout(() => func.apply(context, args), wait);
+        };
+    }
+
+    const performAutoSave = debounce(() => {
+        const btn = document.querySelector('button[onclick="saveRecord()"]');
+        const originalText = "保存结果"; // Default text
+        // Don't override if already showing success message
+        if (btn.innerText !== '已保存!') {
+             btn.innerText = "自动保存中...";
+        }
+
+        saveRecordData()
+            .then(() => {
+                const date = new Date();
+                const timeStr = date.getHours().toString().padStart(2, '0') + ':' + 
+                                date.getMinutes().toString().padStart(2, '0') + ':' + 
+                                date.getSeconds().toString().padStart(2, '0');
+                
+                // Update button or show a small toast
+                btn.innerText = "已自动保存 (" + timeStr + ")";
+                btn.style.color = "#10b981";
+                
+                // Revert style slightly but keep the timestamp text for assurance
+                setTimeout(() => {
+                     btn.style.color = "";
+                     // Optional: revert to "Save Results" after a long while or keep showing last saved time
+                }, 3000);
+            })
+            .catch(err => {
+                console.error("Auto-save failed:", err);
+                btn.innerText = "自动保存失败";
+                btn.style.color = "#ef4444";
+            });
+    }, 1000); // Debounce for 1 second
+
+    // Attach Auto-Save Listeners
     document.addEventListener('DOMContentLoaded', function() {
+        // ... existing name input listeners ...
         const input = document.getElementById('record-name-input');
         
         // Save on Enter key
@@ -313,17 +366,29 @@
                 }
             }, 100);
         });
+
+        // --- New Auto-Save Bindings ---
+        const table = document.querySelector('.tests-table');
+        
+        // Use delegation for better performance and handling dynamic elements (like new steps)
+        table.addEventListener('input', function(e) {
+            if (e.target.isContentEditable) {
+                performAutoSave();
+            }
+        });
+
+        table.addEventListener('change', function(e) {
+            if (e.target.classList.contains('result-select')) {
+                performAutoSave();
+            }
+        });
     });
 
-    function saveRecord() {
-        if (!recordId || recordId === 'None') {
-            alert("No record ID found. Cannot save.");
-            return;
-        }
-
-        const newName = document.getElementById('record-name-input').value;
+    function collectData() {
+         const newName = document.getElementById('record-name-input').value;
         const resultSelects = document.querySelectorAll('.result-select');
-        const editableCells = document.querySelectorAll('.editable-cell[data-field="name"]');
+        const nameCells = document.querySelectorAll('.editable-cell[data-field="name"]');
+        const commentCells = document.querySelectorAll('.editable-cell[data-field="comment"]');
         const editableSteps = document.querySelectorAll('.editable-step');
         
         // Update Results
@@ -333,15 +398,19 @@
         });
 
         // Update Titles
-        editableCells.forEach(cell => {
+        nameCells.forEach(cell => {
              const index = cell.getAttribute('data-index');
              testCases[index].name = cell.innerText.trim();
         });
 
+        // Update Comments
+        commentCells.forEach(cell => {
+             const index = cell.getAttribute('data-index');
+             testCases[index].comment = cell.innerText.trim();
+        });
+
         // Update Steps
         editableSteps.forEach(stepDiv => {
-             // data-index is the CASE index (loop.parent.loop.index0 or loop.index0)
-             // data-step-index is the STEP index within the case
              const caseIndex = stepDiv.getAttribute('data-index');
              const stepIndex = stepDiv.getAttribute('data-step-index');
              const type = stepDiv.getAttribute('data-type');
@@ -354,36 +423,61 @@
                  }
              }
         });
+        
+        return { newName, content: testCases };
+    }
 
-        fetch(`/api/records/${recordId}`, {
-            method: 'PUT',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({
-                name: newName,
-                content: testCases
+    function saveRecordData() {
+        return new Promise((resolve, reject) => {
+            if (!recordId || recordId === 'None') {
+                reject("No record ID found. Cannot save.");
+                return;
+            }
+
+            const data = collectData();
+
+            fetch(`/api/records/${recordId}`, {
+                method: 'PUT',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    name: data.newName,
+                    content: data.content
+                })
             })
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.status === 'success') {
-                const btn = document.querySelector('button[onclick="saveRecord()"]');
-                const originalText = btn.innerText;
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    document.getElementById('record-name-display').innerText = collectData().newName;
+                    resolve(data);
+                } else {
+                    reject('保存失败');
+                }
+            })
+            .catch(err => {
+                console.error(err);
+                reject('Error saving.');
+            });
+        });
+    }
+
+    function saveRecord() {
+        const btn = document.querySelector('button[onclick="saveRecord()"]');
+        const originalText = btn.innerText;
+        btn.innerText = "保存中...";
+        
+        saveRecordData()
+            .then(() => {
                 btn.innerText = "已保存!";
                 btn.style.background = "#10b981"; 
                 setTimeout(() => {
                     btn.innerText = originalText;
                     btn.style.background = "";
                 }, 2000);
-                
-                document.getElementById('record-name-display').innerText = newName;
-            } else {
-                alert('保存失败');
-            }
-        })
-        .catch(err => {
-            console.error(err);
-            alert('Error saving.');
-        });
+            })
+            .catch(err => {
+                alert(err);
+                btn.innerText = originalText;
+            });
     }
 
     function addStep(caseIndex, btn) {
@@ -424,14 +518,20 @@
 
     function copyExecutionResults() {
         if (!recordId || recordId === 'None') return;
+        
+        const btn = document.querySelector('button[onclick="copyExecutionResults()"]');
+        const originalText = btn.innerHTML;
+        btn.innerHTML = "⏳ 处理中...";
 
-        fetch(`/api/records/${recordId}/export`)
+        // Auto-save before copying to ensure data is fresh
+        saveRecordData()
+            .then(() => {
+                return fetch(`/api/records/${recordId}/export`);
+            })
             .then(res => res.text())
             .then(text => {
                 // Copy to clipboard
                 navigator.clipboard.writeText(text).then(() => {
-                    const btn = document.querySelector('button[onclick="copyExecutionResults()"]');
-                    const originalText = btn.innerHTML;
                     btn.innerHTML = "✅ 已复制";
                     setTimeout(() => {
                         btn.innerHTML = originalText;
@@ -439,7 +539,13 @@
                 }, (err) => {
                     console.error('Could not copy text: ', err);
                     alert("复制失败，请手动下载");
+                    btn.innerHTML = originalText;
                 });
+            })
+            .catch(err => {
+                console.error(err);
+                alert("操作失败: " + err);
+                btn.innerHTML = originalText;
             });
     }
 </script>
