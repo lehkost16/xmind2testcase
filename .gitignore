@@ -45,7 +45,6 @@ backups/*.db3
 !backups/.gitkeep
 *.db3
 *.db
-running.log
 
 # Temporary files
 *.tmp
@@ -60,5 +59,7 @@ htmlcov/
 Thumbs.db
 
 # Un-used files
-un_used/running.pid
+
+
 running.log
+running.pid

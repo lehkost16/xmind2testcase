@@ -137,35 +137,25 @@ def export_record(record_id: int, db: sqlite3.Connection = Depends(get_db)):
     # --- Generate Report ---
     report = f"""# {name.split('.')[0]}执行结果
 
-## 1. 模块/套件执行概况
-- **总模块数**: {total_cases}
+## 1. 用例执行统计
+- **用例总数**: {total_cases}
 - **已执行**: {executed_cases}
 - **通过**: {case_stats['Pass']}
 - **失败**: {case_stats['Fail']}
 - **阻塞**: {case_stats['Block']}
 - **跳过**: {case_stats['Skip']}
 
-## 2. 用例执行概况
-- **总用例数**: {step_stats['Total']}
+## 2. 步骤执行统计
+- **步骤总数**: {step_stats['Total']}
 - **通过**: {step_stats['pass']}
 - **失败**: {step_stats['fail']}
 - **未执行**: {step_stats['not_run']}
 
-## 3. 模块/套件执行详情
 
-| 模块/套件 | 功能模块 | 通过 | 失败 | 阻塞 | 跳过 | 未执行 |
-|---|---|---|---|---|---|---|
-"""
-    
-    for suite, stats in suite_stats.items():
-        report += f"| {suite} | {stats['Total']} | {stats['Pass']} | {stats['Fail']} | {stats['Block']} | {stats['Skip']} | {stats['Not Run']} |\n"
+## 3. 详细记录
 
-    report += """
-## 4. 详细记录
-
-| Case ID | Suite | 名称 | 结果 | 备注 |  
-|---|---|---|---|---|
-"""
+| 序号 | 模块 | 用例名称 | 结果 | 步骤情况 | 备注 |  
+|---|---|---|---|---|---|"""
     result_mapping = {
         'Pass': '通过',
         'Fail': '失败',
@@ -178,6 +168,24 @@ def export_record(record_id: int, db: sqlite3.Connection = Depends(get_db)):
         raw_result = test.get('result', 'Not Run')
         result = result_mapping.get(raw_result, raw_result)
         
+        # Steps execution status
+        steps = test.get('steps', [])
+        step_summary = ""
+        if steps:
+            s_total = len(steps)
+            s_pass = sum(1 for s in steps if s.get('status') == 'pass')
+            s_fail = sum(1 for s in steps if s.get('status') == 'fail')
+            s_block = sum(1 for s in steps if s.get('status') == 'block')
+            
+            details = []
+            if s_pass: details.append(f"通过:{s_pass}")
+            if s_fail: details.append(f"失败:{s_fail}")
+            if s_block: details.append(f"阻塞:{s_block}")
+            
+            step_summary = f"总:{s_total}"
+            if details:
+                step_summary += f" ({', '.join(details)})"
+        
         # Ensure values are strings to prevent crashes on None
         comment = str(test.get('comment') or '')
         suite = str(test.get('suite') or 'Root')
@@ -186,8 +194,9 @@ def export_record(record_id: int, db: sqlite3.Connection = Depends(get_db)):
         # Simple cleanup
         title = title.replace('|', '-').replace('\n', ' ')
         comment = comment.replace('|', '-').replace('\n', ' ')
-        
-        report += f"| {idx} | {suite} | {title} | {result} | {comment} |\n"
+        step_summary = step_summary.replace('|', '-')
+
+        report += f"\n| {idx} | {suite} | {title} | {result} | {step_summary} | {comment} |"
         
     encoded_filename = quote(f"{name}_report.md")
     return Response(

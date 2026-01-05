@@ -142,7 +142,8 @@ def parse_a_testcase(case_dict, parent):
     testcase.preconditions = preconditions if preconditions else '无'
 
     summary = gen_testcase_summary(topics)
-    testcase.summary = summary if summary else testcase.name
+    # testcase.summary = summary if summary else testcase.name
+    testcase.summary = summary 
     testcase.execution_type = get_execution_type(topics)
     testcase.importance = get_priority(case_dict) or 2
 
