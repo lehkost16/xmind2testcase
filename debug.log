@@ -1,2 +1,0 @@
-DEBUG: Updating content for record 14. Length: 1
-DEBUG: Executing SQL: UPDATE records SET content = ? WHERE id = ?
