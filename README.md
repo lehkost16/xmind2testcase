@@ -40,40 +40,58 @@ XMind2TestCase 是一个基于 FastAPI 构建的现代化测试用例管理工�
 
 - **后端**: FastAPI + Python 3.13 + SQLite
 - **前端**: HTML5 + Vanilla JS + CSS3 (Modern Flexbox/Grid)
-- **依赖管理**: uv (高性能 Python 包管理器)
+- **依赖管理**: [uv](https://github.com/astral-sh/uv) (极速 Python 包管理器)
 - **部署**: Uvicorn (ASGI 服务器)
 
 ## 🚀 快速开始
 
 ### 1. 环境准备
 
-确保已安装 Python 3.8+ 和 `uv` (推荐)。
+确保已安装 Python 3.13+ 和 `uv` (强烈推荐)。
 
 ```bash
 # 如果未安装 uv
-pip install uv
+curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
 
-### 2. 安装依赖
+### 2. 初始化与同步
 
 ```bash
-uv sync  # 自动安装所有依赖到虚拟环境
+# 初始化项目（创建目录、同步依赖、初始化数据库）
+bash run.sh init
 ```
 
 ### 3. 运行服务
 
-我们提供了一个方便的启动脚本：
-
 ```bash
-bash run.sh
+# 开发模式（带自动重载）
+bash run.sh dev
+
+# 生产模式（多 Worker 运行）
+bash run.sh prod
+
+# 后台运行
+bash run.sh start
 ```
 
-- **开发模式**: `bash run.sh dev` (默认，带自动重载)
-- **生产模式**: `bash run.sh prod`
+服务默认启动在 `http://127.0.0.1:8000`。
 
-服务将启动在 `http://127.0.0.1:8000`。
+## ⚙️ 管理命令 (`run.sh`)
 
-> 提示：首次运行时会自动初始化数据库 `data.db3` 并填充默认配置。
+项目提供了一个全功能的脚本 `run.sh` 来简化操作：
+
+| 命令 | 说明 |
+| :--- | :--- |
+| `init` | 初始化项目环境，安装依赖及配置数据库 |
+| `dev` | 启动开发服务器（代码热更新） |
+| `prod` | 在当前终端启动生产级服务器 |
+| `start` | **后台**启动生产服务器 (使用 nohup) |
+| `stop` | 停止后台运行的服务 |
+| `restart` | 重启后台服务 |
+| `status` | 查看服务运行状态及 PID |
+| `clean` | 清理 Python 编译缓存 (`__pycache__`) |
+| `test` | 运行项目测试用例 |
+| `db` | 启动交互式数据库管理工具 |
 
 ## 📁 项目结构
 
@@ -85,13 +103,12 @@ xmind2testcase/
 │   ├── lib/               # 核心转换库 (XMind解析逻辑)
 │   ├── services/          # 业务逻辑服务
 │   ├── static/            # 静态资源 (CSS, JS, Images)
-│   │   ├── css/          # 样式表
-│   │   └── js/           # ✨ 分页组件等
 │   └── templates/         # HTML 模板 (Jinja2)
+├── docs/                  # 项目文档
 ├── logs/                  # 日志文件目录
 ├── uploads/               # 文件上传目录
 ├── data.db3               # SQLite 数据库
-├── run.sh                 # 启动脚本
+├── run.sh                 # 生命周期管理脚本
 ├── pyproject.toml         # 依赖及项目配置
 └── README.md              # 说明文档
 ```
@@ -99,7 +116,6 @@ xmind2testcase/
 ## 📖 使用指南
 
 ### 1. 编写测试用例 (XMind)
-
 请遵循简单的编写规范：
 - **中心主题**: 即测试集名称（或产品名称）。
 - **分支节点**: 模块或功能名称（支持多级）。
@@ -108,21 +124,18 @@ xmind2testcase/
 - **孙节点**: 自动识别为"预期结果"。
 
 ### 2. 系统配置
-
 访问右上角的 **⚙️ 系统配置**：
 - **项目管理**: 添加或管理项目（项目删除需在此处进行）。
 - **标签管理**: 自定义测试阶段和用例类型。
 - **功能开关**: 开启/关闭禅道或 TestLink 导出按钮。
 
 ### 3. 常用操作
-
 - **上传**: 在首页或项目详情页上传 XMind 文件。
 - **预览与执行**:
   - 在预览页直接标记测试结果（Pass/Fail）。
   - 在“备注”列记录问题或说明。
   - 系统会自动保存您的所有更改。
-  - 点击“复制执行结果”可生成汇总报告用于周报或沟通。
-- **导出**: 支持导出为 ZenTao CSV 或 TestLink XML 供导入到相应系统。
+  - 点击“复制执行结果”可生成汇总报告。
 
 ## 🤝 贡献与反馈
 
