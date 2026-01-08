@@ -1,6 +1,6 @@
 [project]
 name = "xmind2testcase"
-version = "1.2.0"
+version = "1.0.0"
 description = "用例快速转换编辑平台"
 readme = "README.md"
 requires-python = ">=3.13"

@@ -65,7 +65,7 @@ def create_app() -> FastAPI:
     app = FastAPI(
         title="XMind2TestCase",
         description="现代化测试用例管理平台 - 支持 XMind 导入导出",
-        version="1.2.0",
+        version="1.0.0",
         debug=settings.DEBUG,
         docs_url="/docs",
         redoc_url="/redoc"
@@ -100,7 +100,7 @@ def create_app() -> FastAPI:
         """应用启动事件"""
         logger.info("=" * 60)
         logger.info("🚀 XMind2TestCase 应用启动")
-        logger.info(f"📦 版本: 1.2.0")
+        logger.info(f"📦 版本: 1.0.0")
         logger.info(f"🐛 调试模式: {settings.DEBUG}")
         logger.info(f"📁 上传目录: {settings.UPLOAD_FOLDER}")
         logger.info(f"💾 数据库: {settings.DATABASE_PATH}")
@@ -135,7 +135,7 @@ def create_app() -> FastAPI:
         
         return {
             "status": "healthy" if db_exists and upload_dir_exists else "degraded",
-            "version": "1.2.0",
+            "version": "1.0.0",
             "database": db_exists,
             "upload_directory": upload_dir_exists,
             "debug_mode": settings.DEBUG
