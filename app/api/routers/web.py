@@ -6,7 +6,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from app.core.config import settings
 from app.api.deps import get_db
-from app.services import file_service, xmind_service
+from app.services import file_service, xmind_service, automation_scanner
 
 router = APIRouter()
 templates = Jinja2Templates(directory=os.path.join(settings.APP_DIR, "templates"))
@@ -106,6 +106,18 @@ async def update_configs(data: dict = Body(...), db: sqlite3.Connection = Depend
     except Exception as e:
         db.rollback()
         return {"status": "error", "message": str(e)}
+
+@router.post("/api/projects/{project_id}/automation")
+async def update_project_automation(project_id: int, data: dict = Body(...), db: sqlite3.Connection = Depends(get_db)):
+    path = data.get("playwright_project_path", "").strip()
+    cursor = db.cursor()
+    cursor.execute("""
+        INSERT INTO automation_configs (project_id, playwright_project_path) 
+        VALUES (?, ?)
+        ON CONFLICT(project_id) DO UPDATE SET playwright_project_path = excluded.playwright_project_path
+    """, (project_id, path))
+    db.commit()
+    return {"status": "success"}
 
 @router.get("/", response_class=HTMLResponse, name="index")
 def index(request: Request, db: sqlite3.Connection = Depends(get_db)):
@@ -215,12 +227,18 @@ def project_detail(request: Request, project_id: int, db: sqlite3.Connection = D
     case_types = [c.strip() for c in configs.get('case_types', '').split(',') if c.strip()]
     apply_phases = [p.strip() for p in configs.get('apply_phases', '').split(',') if p.strip()]
     
+    # Fetch automation config
+    cursor.execute("SELECT playwright_project_path FROM automation_configs WHERE project_id = ?", (project_id,))
+    auto_row = cursor.fetchone()
+    automation_config = {"playwright_project_path": auto_row[0] if auto_row else ""}
+    
     return templates.TemplateResponse("project_detail.html", {
         "request": request,
         "project": project,
         "records": records,
         "case_types": case_types,
         "apply_phases": apply_phases,
+        "automation_config": automation_config,
         "settings": dyn_settings
     })
 
@@ -273,6 +291,15 @@ def preview_record(request: Request, record_id: int, db: sqlite3.Connection = De
     
     _, dyn_settings = fetch_configs(db)
 
+    # Fetch automation bindings if project has config
+    automation_bindings = []
+    if record[3]: # project_id
+        cursor.execute("SELECT playwright_project_path FROM automation_configs WHERE project_id = ?", (record[3],))
+        auto_row = cursor.fetchone()
+        if auto_row and auto_row[0]:
+            found_ids = automation_scanner.scanner.scan_directory(auto_row[0])
+            automation_bindings = list(found_ids)
+
     response = templates.TemplateResponse('preview.html', {
         "request": request, 
         "name": record_name, 
@@ -280,6 +307,7 @@ def preview_record(request: Request, record_id: int, db: sqlite3.Connection = De
         "suite_count": suite_count,
         "record_id": record[0],
         "project_id": record[3],
+        "automation_bindings": automation_bindings,
         "settings": dyn_settings
     })
     # Disable caching to ensure fresh data on reload

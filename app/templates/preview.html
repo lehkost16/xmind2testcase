@@ -80,7 +80,20 @@
                 <td class="text-center">{{ loop.index }}</td>
                 <td style="font-weight: 500;">{{ test.suite }}</td>
                 <td>
-                    <div contenteditable="true" class="editable-cell" data-index="{{ case_index }}" data-field="name" data-placeholder="请输入用例标题...">{{ test.name }}</div>
+                    <div style="display: flex; align-items: flex-start; gap: 8px; margin-bottom: 4px;">
+                        <span style="font-size: 0.75rem; color: var(--text-muted); padding-top: 4px;">ID:</span>
+                        <div contenteditable="true" class="editable-cell tc-id-cell" data-index="{{ case_index }}" data-field="tc_id" data-placeholder="未设置 ID" 
+                             style="font-size: 0.85rem; color: var(--primary-color); font-family: monospace; min-width: 60px;"
+                             oninput="updateBindingStatus(this, {{ case_index }})">{{ test.tc_id or '' }}</div>
+                        <span class="binding-tag" data-index="{{ case_index }}">
+                            {% if test.tc_id and test.tc_id in automation_bindings %}
+                                <span class="tag-success" style="font-size: 0.7rem; padding: 2px 6px; white-space: nowrap;" title="已绑定">已绑定</span>
+                            {% elif test.tc_id %}
+                                <span class="tag-info" style="font-size: 0.7rem; padding: 2px 6px; white-space: nowrap; background-color: #f1f5f9; color: #64748b;" title="未绑定">未绑定</span>
+                            {% endif %}
+                        </span>
+                    </div>
+                    <div contenteditable="true" class="editable-cell" data-index="{{ case_index }}" data-field="name" data-placeholder="请输入用例标题..." style="font-weight: 600; color: #1e293b; font-size: 1.05rem;">{{ test.name }}</div>
                     {% if test.name|length>100 %}
                         <div class="long-name-info">⚠️ 名称过长</div>
                     {% endif %}
@@ -208,10 +221,9 @@
         padding: 1.25rem 1rem;
     }
 
-    .editable-cell[data-field="name"] {
-        font-weight: 600;
-        color: #1e293b;
-        font-size: 1.05rem;
+    .tc-id-cell:hover {
+        background-color: #f1f5f9;
+        border-bottom: 1px dashed var(--primary-color);
     }
 
     .editable-step {
@@ -273,6 +285,7 @@
 <script>
     const recordId = document.getElementById('record-id').value;
     const testCases = {{ suite | tojson | safe }};
+    const automationBindings = {{ (automation_bindings | default([])) | tojson | safe }};
     
     // Ensure all test cases have a comment field and steps have status
     testCases.forEach(tc => {
@@ -465,10 +478,11 @@
     });
 
     function collectData() {
-         const newName = document.getElementById('record-name-input').value;
+        const newName = document.getElementById('record-name-input').value;
         const resultSelects = document.querySelectorAll('.result-select');
         const nameCells = document.querySelectorAll('.editable-cell[data-field="name"]');
         const commentCells = document.querySelectorAll('.editable-cell[data-field="comment"]');
+        const tcIdCells = document.querySelectorAll('.editable-cell[data-field="tc_id"]');
         const editableSteps = document.querySelectorAll('.editable-step');
         
         // Update Results
@@ -481,6 +495,12 @@
         nameCells.forEach(cell => {
              const index = cell.getAttribute('data-index');
              testCases[index].name = cell.innerText.trim();
+        });
+
+        // Update TC_IDs
+        tcIdCells.forEach(cell => {
+             const index = cell.getAttribute('data-index');
+             testCases[index].tc_id = cell.innerText.trim();
         });
 
         // Update Comments
@@ -505,6 +525,22 @@
         });
         
         return { newName, content: testCases };
+    }
+
+    function updateBindingStatus(cell, index) {
+        const newId = cell.innerText.trim();
+        const tagContainer = document.querySelector(`.binding-tag[data-index="${index}"]`);
+        
+        if (!newId) {
+            tagContainer.innerHTML = '';
+            return;
+        }
+
+        if (automationBindings.includes(newId)) {
+            tagContainer.innerHTML = '<span class="tag-success" style="font-size: 0.7rem; padding: 2px 6px; white-space: nowrap;" title="已发现匹配的代码">已绑定</span>';
+        } else {
+            tagContainer.innerHTML = '<span class="tag-info" style="font-size: 0.7rem; padding: 2px 6px; white-space: nowrap; background-color: #f1f5f9; color: #64748b;" title="代码库中未找到此 ID">未绑定</span>';
+        }
     }
 
     function saveRecordData() {

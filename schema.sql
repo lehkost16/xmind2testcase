@@ -32,3 +32,12 @@ INSERT INTO configs (key, value) VALUES ('apply_phases', '单元测试阶段,功
 INSERT INTO configs (key, value) VALUES ('projects', '默认项目');
 INSERT INTO configs (key, value) VALUES ('enable_zentao', '1');
 INSERT INTO configs (key, value) VALUES ('enable_testlink', '1');
+
+-- Automation Configuration Table
+CREATE TABLE IF NOT EXISTS automation_configs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_id INTEGER NOT NULL UNIQUE,
+    playwright_project_path TEXT,
+    execution_params TEXT, -- JSON string for extra params
+    FOREIGN KEY(project_id) REFERENCES projects(id)
+);

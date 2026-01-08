@@ -44,8 +44,40 @@ def convert_to_xmind(filename: str, testsuites=None):
     return None
 
 def reconstruct_testsuites_from_db_list(testcase_list, root_name="Exported from XMind2TestCase"):
-    """Reconstruct a TestSuite logic from flat list for TestLink export."""
-    suites_map = {} # Mapping suite_name -> TestSuite
+    """Reconstruct a TestSuite hierarchy from flat list of test cases.
+    
+    The function parses hierarchical test case names (e.g., "Suite > Module > Case")
+    and rebuilds the original tree structure with nested TestSuite objects.
+    """
+    import logging
+    
+    
+    if not testcase_list:
+        root_suite = TestSuite()
+        root_suite.name = root_name
+        root_suite.sub_suites = []
+        return [root_suite]
+    
+    # Valid separators as defined in parser.py config
+    valid_separators = ['>', '-', '&', '+', '/']
+    
+    # Auto-detect separator from the first test case
+    detected_sep = None
+    sample_name = testcase_list[0].get('name', '')
+    logging.info(f"🔍 Detecting separator from sample: {sample_name}")
+    for sep in valid_separators:
+        # Check with spaces around separator (as parser adds them)
+        if f' {sep} ' in sample_name:
+            detected_sep = f' {sep} '
+            break
+    
+    # Fallback to ' - ' if no separator detected
+    if not detected_sep:
+        detected_sep = ' - '
+    
+    logging.info(f"✅ Detected separator: '{detected_sep}'")
+    
+    suites_map = {}  # Mapping suite_name -> TestSuite
     
     for case_dict in testcase_list:
         suite_name = case_dict.get('suite', 'Default Suite')
@@ -54,36 +86,32 @@ def reconstruct_testsuites_from_db_list(testcase_list, root_name="Exported from 
         if suite_name not in suites_map:
             ts = TestSuite()
             ts.name = suite_name
-            ts.sub_suites = [] 
+            ts.sub_suites = []
             ts.testcase_list = []
             suites_map[suite_name] = ts
         
         root_ts = suites_map[suite_name]
         
-        # Unflatten Name to reconstruct hierarchy
-        # Name format usually: "SuiteName - Module - Case" or "SuiteName Case"
-        # We try to split by ' - ' first, then ' '.
-        # Strategy: Remove suite_name from start if present.
+        # Parse hierarchical name
         full_name = case_dict.get('name', 'No Name')
         
-        # Normalize simple case where suite name is prefix
-        clean_name = full_name
-        if full_name.startswith(suite_name):
-            # Strip suite name and potential separator
-            clean_name = full_name[len(suite_name):].strip()
-            for sep in ['- ', ' - ', ' ']:
-                if clean_name.startswith(sep):
-                    clean_name = clean_name[len(sep):].strip()
-                    break
+        # Split by detected separator
+        parts = full_name.split(detected_sep)
+        parts = [p.strip() for p in parts if p.strip()]  # Clean up parts
         
-        # Now clean_name is "Module - Case" or just "Case"
-        # Split into parts
-        parts = []
-        if ' - ' in clean_name:
-            parts = clean_name.split(' - ')
-        else:
-            parts = [clean_name]
-            
+        logging.debug(f"📋 Parsing '{full_name}' → parts: {parts}")
+        
+        if not parts:
+            parts = [full_name]
+        
+        # Remove suite name from parts if it's the first part
+        if parts and parts[0] == suite_name:
+            parts = parts[1:]
+            logging.debug(f"   Removed suite name, remaining: {parts}")
+        
+        if not parts:
+            parts = ['Unnamed Case']
+        
         # Traverse/Build hierarchy
         # The last part is the Case Name. The earlier parts are SubSuites.
         current_suite = root_ts
@@ -102,15 +130,16 @@ def reconstruct_testsuites_from_db_list(testcase_list, root_name="Exported from 
                 found.name = part
                 found.sub_suites = []
                 found.testcase_list = []
-                # Ensure sub_suites is initialized in metadata if None (class init defaults to None)
+                # Ensure sub_suites is initialized
                 if current_suite.sub_suites is None:
                     current_suite.sub_suites = []
                 current_suite.sub_suites.append(found)
             
             current_suite = found
-            
-        # The actual case
+        
+        # The actual test case
         case_name = parts[-1]
+        logging.info(f"   ➡️ Creating TestCase: '{case_name}' (from parts {parts})")
         
         # Reconstruct TestCase object
         tc = TestCase()
@@ -119,9 +148,11 @@ def reconstruct_testsuites_from_db_list(testcase_list, root_name="Exported from 
         tc.summary = case_dict.get('summary', '')
         tc.preconditions = case_dict.get('preconditions', '')
         tc.execution_type = 2 if case_dict.get('execution_type') in [2, '2', 'Automated'] else 1
+        tc.tc_id = case_dict.get('tc_id', '')
         tc.importance = case_dict.get('importance', 2)
-        tc.status = 7 
+        tc.status = 7
         tc.result = case_dict.get('result', 0)
+        tc.labels = case_dict.get('labels', [])
         
         # Reconstruct Steps
         steps_data = case_dict.get('steps', [])
@@ -133,7 +164,7 @@ def reconstruct_testsuites_from_db_list(testcase_list, root_name="Exported from 
             step.expectedresults = s.get('expectedresults', '')
             step.execution_type = 1
             tc.steps.append(step)
-            
+        
         if current_suite.testcase_list is None:
             current_suite.testcase_list = []
         current_suite.testcase_list.append(tc)
@@ -143,3 +174,4 @@ def reconstruct_testsuites_from_db_list(testcase_list, root_name="Exported from 
     root_suite.name = root_name
     root_suite.sub_suites = list(suites_map.values())
     return [root_suite]
+

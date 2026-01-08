@@ -52,8 +52,13 @@ def filter_empty_or_ignore_element(values):
     """Filter all empty or ignore XMind elements, especially notes、comments、labels element"""
     result = []
     for value in values:
-        if isinstance(value, str) and not value.strip() == '' and not value[0] in config['ignore_char']:
-            result.append(value.strip())
+        if isinstance(value, str):
+            if not value.strip() == '' and not value[0] in config['ignore_char']:
+                result.append(value.strip())
+        elif isinstance(value, list):
+            for v in value:
+                if isinstance(v, str) and not v.strip() == '' and not v[0] in config['ignore_char']:
+                    result.append(v.strip())
     return result
 
 
@@ -146,6 +151,7 @@ def parse_a_testcase(case_dict, parent):
     testcase.summary = summary 
     testcase.execution_type = get_execution_type(topics)
     testcase.importance = get_priority(case_dict) or 2
+    testcase.tc_id = get_tc_id(topics)
 
     step_dict_list = case_dict.get('topics', [])
     if step_dict_list:
@@ -168,9 +174,12 @@ def parse_a_testcase(case_dict, parent):
     logging.debug('finds a testcase: %s', testcase.to_dict())
     return testcase
 
-
 def get_execution_type(topics):
-    labels = [topic.get('label', '') for topic in topics]
+    labels = []
+    for topic in topics:
+        labels.append(topic.get('label', ''))
+        labels.append(topic.get('labels', []))
+    
     labels = filter_empty_or_ignore_element(labels)
     exe_type = 1
     for item in labels[::-1]:
@@ -181,6 +190,23 @@ def get_execution_type(topics):
             exe_type = 1
             break
     return exe_type
+
+
+def get_tc_id(topics):
+    """Get the testcase ID from labels (the last one wins)"""
+    labels = []
+    for topic in topics:
+        labels.append(topic.get('label', ''))
+        labels.append(topic.get('labels', []))
+    
+    labels = filter_empty_or_ignore_element(labels)
+    # Usually we expect IDs like TC-001, but we return any valid label as a potential ID
+    # if it doesn't match a known exclusion list (though here we just take the last valid one)
+    for item in labels[::-1]:
+        # Filter out labels used for execution type if needed, or just return the last non-empty label
+        if item.lower() not in ['自动', 'auto', 'automate', 'automation', '手动', '手工', 'manual']:
+            return item
+    return ''
 
 
 def get_priority(case_dict):

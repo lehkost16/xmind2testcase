@@ -82,6 +82,18 @@ def case_to_topic(case):
             ]
         except:
             pass
+
+    # Add Labels (for automation binding)
+    labels = []
+    if case.tc_id:
+        labels.append(case.tc_id)
+    if case.execution_type == 2:
+        labels.append("自动")
+    elif case.execution_type == 1:
+        labels.append("手动")
+    
+    if labels:
+        topic["labels"] = labels
     
     # Steps
     if case.steps:
