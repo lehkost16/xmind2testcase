@@ -61,22 +61,6 @@ def reconstruct_testsuites_from_db_list(testcase_list, root_name="Exported from 
     # Valid separators as defined in parser.py config
     valid_separators = ['>', '-', '&', '+', '/']
     
-    # Auto-detect separator from the first test case
-    detected_sep = None
-    sample_name = testcase_list[0].get('name', '')
-    logging.info(f"🔍 Detecting separator from sample: {sample_name}")
-    for sep in valid_separators:
-        # Check with spaces around separator (as parser adds them)
-        if f' {sep} ' in sample_name:
-            detected_sep = f' {sep} '
-            break
-    
-    # Fallback to ' - ' if no separator detected
-    if not detected_sep:
-        detected_sep = ' - '
-    
-    logging.info(f"✅ Detected separator: '{detected_sep}'")
-    
     suites_map = {}  # Mapping suite_name -> TestSuite
     
     for case_dict in testcase_list:
@@ -95,11 +79,27 @@ def reconstruct_testsuites_from_db_list(testcase_list, root_name="Exported from 
         # Parse hierarchical name
         full_name = case_dict.get('name', 'No Name')
         
-        # Split by detected separator
-        parts = full_name.split(detected_sep)
-        parts = [p.strip() for p in parts if p.strip()]  # Clean up parts
+        # Robust Separator Detection per case
+        best_sep = None
+        max_parts = 1
         
-        logging.debug(f"📋 Parsing '{full_name}' → parts: {parts}")
+        # Try each separator both with and without spaces
+        for sep in valid_separators:
+            for s_variant in [f' {sep} ', sep]:
+                if s_variant in full_name:
+                    parts_count = len(full_name.split(s_variant))
+                    if parts_count > max_parts:
+                        max_parts = parts_count
+                        best_sep = s_variant
+        
+        # Split by the best detected separator for this specific name
+        if best_sep:
+            parts = full_name.split(best_sep)
+            logging.debug(f"🔍 Detected '{best_sep}' for '{full_name}' → {len(parts)} parts")
+        else:
+            parts = [full_name]
+            
+        parts = [p.strip() for p in parts if p.strip()]  # Clean up parts
         
         if not parts:
             parts = [full_name]
