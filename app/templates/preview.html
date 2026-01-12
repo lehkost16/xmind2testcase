@@ -36,24 +36,25 @@
                     </button>
                 </div>
             </div>
-            <div style="margin-top: 1.5rem; display: flex; gap: 1rem;">
+            <div style="margin-top: 1.5rem; display: flex; gap: 1rem; align-items: center; flex-wrap: wrap;">
                 {% if settings.ENABLE_ZENTAO %}
-                <a href="{{ url_for('download_zentao_file',filename= name) }}" class="btn-action">
+                <a href="#" onclick="exportWithFilter('zentao')" class="btn-action">
                     <span class="btn-icon">📊</span>
                     <span class="btn-text">导出禅道 CSV</span>
                 </a>
                 {% endif %}
                 {% if settings.ENABLE_TESTLINK %}
-                <a href="{{ url_for('download_testlink_file',filename= name) }}" class="btn-action">
+                <a href="#" onclick="exportWithFilter('testlink')" class="btn-action">
                     <span class="btn-icon">📄</span>
                     <span class="btn-text">导出 TestLink XML</span>
                 </a>
                 {% endif %}
-                <a href="{{ url_for('download_xmind_file',filename= name) }}" class="btn-action">
+                <a href="#" onclick="exportWithFilter('xmind')" class="btn-action">
                     <span class="btn-icon">📥</span>
                     <span class="btn-text">导出 XMind</span>
                 </a>
             </div>
+            
         </div>
     </div>
 
@@ -64,6 +65,12 @@
     <table class="pure-table tests-table" style="width: 100%; border: none; margin: 0;">
         <thead>
         <tr>
+            <th width="32px" class="text-center">
+                <label class="checkbox-container" style="padding-left: 18px;">
+                    <input type="checkbox" id="select-all-cases" checked onchange="toggleAllCases(this)">
+                    <span class="checkmark" style="height: 16px; width: 16px;"></span>
+                </label>
+            </th>
             <th width="40px" class="text-center">#</th>
             <th width="10%">模块/套件</th>
             <th>用例标题</th>
@@ -77,6 +84,12 @@
         {% for test in suite %}
             {% set case_index = loop.index0 %}
             <tr>
+                <td class="text-center">
+                    <label class="checkbox-container" style="padding-left: 18px;">
+                        <input type="checkbox" class="case-checkbox" value="{{ case_index }}" checked onchange="updateSelectAllStatus()">
+                        <span class="checkmark" style="height: 16px; width: 16px;"></span>
+                    </label>
+                </td>
                 <td class="text-center">{{ loop.index }}</td>
                 <td style="font-weight: 500;">{{ test.suite }}</td>
                 <td>
@@ -280,12 +293,184 @@
         background-color: #fee2e2;
         color: #ef4444;
     }
+
+    /* Module Filter Card Styles */
+    .module-filter-card {
+        background: rgba(255, 255, 255, 0.7);
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        border-radius: 12px;
+        padding: 1.25rem;
+        margin-top: 1.5rem;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    }
+
+    .suites-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+        gap: 10px;
+        max-height: 200px;
+        overflow-y: auto;
+        padding: 4px;
+    }
+
+    /* Custom Checkbox Styles */
+    .checkbox-container {
+        display: flex;
+        align-items: center;
+        position: relative;
+        padding-left: 30px;
+        cursor: pointer;
+        font-size: 0.9rem;
+        user-select: none;
+        color: var(--text-color);
+        transition: color 0.2s;
+    }
+
+    .checkbox-container:hover {
+        color: var(--primary-color);
+    }
+
+    .checkbox-container input {
+        position: absolute;
+        opacity: 0;
+        cursor: pointer;
+        height: 0;
+        width: 0;
+    }
+
+    .checkmark {
+        position: absolute;
+        top: 50%;
+        left: 0;
+        transform: translateY(-50%);
+        height: 18px;
+        width: 18px;
+        background-color: #f1f5f9;
+        border: 1.5px solid #cbd5e1;
+        border-radius: 4px;
+        transition: all 0.2s;
+    }
+
+    .checkbox-container:hover input ~ .checkmark {
+        border-color: var(--primary-color);
+        background-color: #f8fafc;
+    }
+
+    .checkbox-container input:checked ~ .checkmark {
+        background-color: var(--primary-color);
+        border-color: var(--primary-color);
+    }
+
+    .checkmark:after {
+        content: "";
+        position: absolute;
+        display: none;
+    }
+
+    .checkbox-container input:checked ~ .checkmark:after {
+        display: block;
+    }
+
+    .checkbox-container .checkmark:after {
+        left: 6px;
+        top: 2px;
+        width: 4px;
+        height: 9px;
+        border: solid white;
+        border-width: 0 2px 2px 0;
+        transform: rotate(45deg);
+    }
+
+    .suite-name {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    /* Back to Top Button */
+    .back-to-top-btn {
+        position: fixed;
+        bottom: 30px;
+        right: 30px;
+        width: 44px;
+        height: 44px;
+        background-color: var(--primary-color);
+        color: white;
+        border: none;
+        border-radius: 50%;
+        cursor: pointer;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 10px 15px -3px rgba(59, 130, 246, 0.3);
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        z-index: 1000;
+    }
+
+    .back-to-top-btn:hover {
+        transform: translateY(-5px);
+        background-color: #2563eb;
+        box-shadow: 0 20px 25px -5px rgba(59, 130, 246, 0.4);
+    }
+
+    .back-to-top-btn svg {
+        transition: transform 0.3s;
+    }
+
+    .back-to-top-btn:hover svg {
+        transform: scale(1.1);
+    }
 </style>
 
 <script>
     const recordId = document.getElementById('record-id').value;
     const testCases = {{ suite | tojson | safe }};
     const automationBindings = {{ (automation_bindings | default([])) | tojson | safe }};
+    const filename = "{{ name }}";
+
+    function toggleAllCases(masterCheckbox) {
+        const checkboxes = document.querySelectorAll('.case-checkbox');
+        checkboxes.forEach(cb => {
+            cb.checked = masterCheckbox.checked;
+        });
+    }
+
+    function updateSelectAllStatus() {
+        const checkboxes = document.querySelectorAll('.case-checkbox');
+        const selectAll = document.getElementById('select-all-cases');
+        const allChecked = Array.from(checkboxes).every(cb => cb.checked);
+        const someChecked = Array.from(checkboxes).some(cb => cb.checked);
+        
+        selectAll.checked = allChecked;
+        selectAll.indeterminate = someChecked && !allChecked;
+    }
+
+    function exportWithFilter(type) {
+        const selectedIndices = Array.from(document.querySelectorAll('.case-checkbox:checked'))
+                                    .map(cb => cb.value);
+        
+        if (selectedIndices.length === 0) {
+            alert('请至少选择一个用例进行导出');
+            return;
+        }
+
+        let url = "";
+        if (type === 'zentao') {
+            url = `/${filename}/to/zentao`;
+        } else if (type === 'testlink') {
+            url = `/${filename}/to/testlink`;
+        } else if (type === 'xmind') {
+            url = `/${filename}/to/xmind`;
+        }
+
+        const query = new URLSearchParams();
+        query.append('cases', selectedIndices.join(','));
+        url += `?${query.toString()}`;
+
+        window.location.href = url;
+    }
+
     
     // Ensure all test cases have a comment field and steps have status
     testCases.forEach(tc => {
@@ -475,6 +660,25 @@
                 performAutoSave();
             }
         });
+
+        // Back to Top Logic
+        const backToTopBtn = document.getElementById('back-to-top');
+        if (backToTopBtn) {
+            window.addEventListener('scroll', () => {
+                if (window.scrollY > 300) {
+                    backToTopBtn.style.display = 'flex';
+                } else {
+                    backToTopBtn.style.display = 'none';
+                }
+            });
+
+            backToTopBtn.addEventListener('click', () => {
+                window.scrollTo({
+                    top: 0,
+                    behavior: 'smooth'
+                });
+            });
+        }
     });
 
     function collectData() {
@@ -773,5 +977,8 @@
             });
     }
 </script>
+    <button id="back-to-top" class="back-to-top-btn" title="回到顶部">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m18 15-6-6-6 6"/></svg>
+    </button>
 </body>
 </html>

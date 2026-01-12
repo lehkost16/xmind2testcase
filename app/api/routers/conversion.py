@@ -1,5 +1,5 @@
 import os
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import FileResponse
 from app.core.config import settings
 from app.api.deps import get_db
@@ -18,15 +18,21 @@ def download_uploaded_file(filename: str):
     return FileResponse(file_path)
 
 @router.get("/{filename}/to/testlink", name="download_testlink_file")
-def download_testlink_file(filename: str, db=Depends(get_db)):
+def download_testlink_file(filename: str, cases: str = Query(None), db=Depends(get_db)):
     record = file_service.get_record_by_filename(db, filename)
     testsuites = None
     if record and record['content']:
         import json
         try:
-            cases = json.loads(record['content'])
+            testcases = json.loads(record['content'])
+            
+            # Filter by cases (indices) if provided
+            if cases:
+                indices = [int(i) for i in cases.split(',') if i.strip().isdigit()]
+                testcases = [testcases[i] for i in indices if 0 <= i < len(testcases)]
+                
             root_name = os.path.splitext(filename)[0]
-            testsuites = xmind_service.reconstruct_testsuites_from_db_list(cases, root_name=root_name)
+            testsuites = xmind_service.reconstruct_testsuites_from_db_list(testcases, root_name=root_name)
         except:
             pass
             
@@ -41,7 +47,7 @@ def download_testlink_file(filename: str, db=Depends(get_db)):
     )
 
 @router.get("/{filename}/to/zentao", name="download_zentao_file")
-def download_zentao_file(filename: str, db=Depends(get_db)):
+def download_zentao_file(filename: str, cases: str = Query(None), db=Depends(get_db)):
     record = file_service.get_record_by_filename(db, filename)
     testcases = None
     case_type = None
@@ -53,6 +59,11 @@ def download_zentao_file(filename: str, db=Depends(get_db)):
             import json
             try:
                 testcases = json.loads(record['content'])
+                
+                # Filter by cases (indices) if provided
+                if cases:
+                    indices = [int(i) for i in cases.split(',') if i.strip().isdigit()]
+                    testcases = [testcases[i] for i in indices if 0 <= i < len(testcases)]
             except:
                 pass
 
@@ -67,15 +78,21 @@ def download_zentao_file(filename: str, db=Depends(get_db)):
     )
 
 @router.get("/{filename}/to/xmind", name="download_xmind_file")
-def download_xmind_file(filename: str, db=Depends(get_db)):
+def download_xmind_file(filename: str, cases: str = Query(None), db=Depends(get_db)):
     record = file_service.get_record_by_filename(db, filename)
     testsuites = None
     if record and record['content']:
         import json
         try:
-            cases = json.loads(record['content'])
+            testcases = json.loads(record['content'])
+            
+            # Filter by cases (indices) if provided
+            if cases:
+                indices = [int(i) for i in cases.split(',') if i.strip().isdigit()]
+                testcases = [testcases[i] for i in indices if 0 <= i < len(testcases)]
+                
             root_name = os.path.splitext(filename)[0]
-            testsuites = xmind_service.reconstruct_testsuites_from_db_list(cases, root_name=root_name)
+            testsuites = xmind_service.reconstruct_testsuites_from_db_list(testcases, root_name=root_name)
         except:
             pass
 
